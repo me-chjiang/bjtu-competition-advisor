@@ -31,6 +31,7 @@
 ### B：Agent 与评分
 - 后端由本次讨论的用户主要负责，采用 Python + FastAPI + LiteLLM + Lexmount Python SDK；详见 `docs/plan.md`「后端方案」。单进程、单 Agent、本地 JSON，不引入 PostgreSQL、Redis 或独立 Worker。
 - [ ] 确认模型 key 的安全读取方式，搭建 `backend/`，通过 LiteLLM 跑通结构化输出和工具调用；不再开发原计划的 `lib/deepseek.mjs`。
+- [ ] 按 [LLM 对接约定](llm-integration.md) 验证异步请求、tool_call_id 回传、JSON 校验、超时与重试预算；文档示例不等于真实接口已经跑通。
 - [ ] 用少量审核数据跑通 R0 访谈 → R1 粗筛 → R2 证据卡片 → R4 路线，并支持用户修改和确认。
 - [ ] 与采集侧约定竞赛实例、通知和证据的 JSON 格式；首轮建议深度验证 30–50 个实例，不把约 700 条原始记录等同于不同竞赛。
 - [ ] 用 Python 函数检查资格、每周工时和日期冲突，补充工具失败、引用和会话恢复测试。
@@ -41,6 +42,7 @@
 - [ ] 用活动页报名，领取 2 个月 Pro（Free 只有 3 个并发，Browser hours 也少）。
 - [ ] 登录投稿页，查看表单字段（未登录时看不到）。
 - [ ] 独立前端通过 FastAPI HTTP 接口对接（对话、画像编辑、候选保留/排除/恢复、阶段确认、结果与证据展示）；不再依赖原方案的 `web/server.mjs`，前端框架待定。
+- [ ] 按 [前后端契约](frontend-contract.md) 先用虚构样例 mock；联调检查版本冲突、重复请求、画像修改后旧结果失效及统一错误提示。API base URL 为 `http://127.0.0.1:8000/api`，接口待实现。
 - [ ] `docs/project-overview.html`：10-15 决定暂不审核，先保持现状。
 - [ ] 评估：
   - 人工抽检 30 条；
