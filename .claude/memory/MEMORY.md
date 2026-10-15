@@ -1,0 +1,1 @@
+- [Lexmount credentials](lexmount-credentials.md) — Lexmount key + BJTU MIS login, stored in git-ignored lexmount-config.yaml

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>北交大竞赛能力匹配 Agent：项目概览</title>
+<style>
+:root {
+  --bg: #FAF9F5;
+  --bg-soft: #F0EEE6;
+  --ink: #141413;
+  --ink-2: #3D3D3A;
+  --muted: #73726C;
+  --line: #E0DDD2;
+  --accent: #D97757;
+  --done-bg: #E3EBDD; --done-fg: #4A6741;
+  --plan-bg: #F6E3D8; --plan-fg: #A85A3C;
+  --ver-bg: #F3E9C8; --ver-fg: #7D6A1E;
+  --serif: "Iowan Old Style", "Songti SC", "Noto Serif SC", "Source Han Serif SC", "STSong", Georgia, "Times New Roman", serif;
+  --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink-2);
+  font-family: var(--sans); font-size: 16px; line-height: 1.8;
+}
+.wrap { max-width: 960px; margin: 0 auto; padding: 0 24px 72px; }
+.banner {
+  background: var(--bg-soft); color: var(--ink-2); font-size: 14px;
+  text-align: center; padding: 10px 24px; border-bottom: 1px solid var(--line);
+}
+header { padding: 56px 0 24px; }
+h1, h2, h3 { font-family: var(--serif); color: var(--ink); font-weight: 600; line-height: 1.35; }
+h1 { font-size: 2.2rem; margin: 0 0 16px; }
+h2 { font-size: 1.5rem; margin: 0 0 20px; }
+h2 .n { color: var(--accent); font-size: 0.9rem; font-family: var(--sans); margin-right: 10px; letter-spacing: 0.05em; }
+h3 { font-size: 1.05rem; margin: 28px 0 8px; }
+.lead { font-family: var(--serif); font-size: 1.2rem; color: var(--ink); margin: 0; }
+section { padding: 44px 0 0; }
+p { margin: 0 0 12px; }
+ul { margin: 0; padding-left: 1.2em; }
+li { margin: 4px 0; }
+li::marker { color: var(--accent); }
+code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.9em; background: var(--bg-soft); padding: 1px 5px; border-radius: 4px; }
+
+.three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 28px; }
+.three div { border-top: 2px solid var(--accent); padding-top: 10px; }
+.three b { display: block; font-family: var(--serif); color: var(--ink); font-size: 1.05rem; }
+.three p { margin: 4px 0 0; font-size: 0.95rem; }
+
+.pill {
+  display: inline-block; font-size: 12px; line-height: 1.5; padding: 0 9px; border-radius: 999px;
+  font-family: var(--sans); font-weight: 500; vertical-align: 1px; white-space: nowrap; margin: 1px 2px 1px 0;
+}
+.pill.done { background: var(--done-bg); color: var(--done-fg); }
+.pill.plan { background: var(--plan-bg); color: var(--plan-fg); }
+.pill.ver { background: var(--ver-bg); color: var(--ver-fg); }
+.legend { font-size: 13px; color: var(--muted); margin-top: 20px; }
+
+/* flow */
+.flow { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 22px; counter-reset: s; }
+.flow > li { margin: 0; position: relative; }
+.flow > li:not(:last-child)::after {
+  content: "\2192"; position: absolute; right: -19px; top: 18px; color: var(--accent); font-size: 16px; line-height: 1;
+}
+.card {
+  height: 100%; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 14px 14px 12px;
+  font-size: 14px; line-height: 1.65; break-inside: avoid; page-break-inside: avoid;
+}
+.card h3 { margin: 0 0 2px; font-size: 1.05rem; }
+.card .tag { font-size: 12px; color: var(--accent); letter-spacing: 0.05em; }
+.card .funnel { font-family: var(--serif); color: var(--ink); font-size: 1.05rem; margin: 6px 0 8px; }
+.card dl { margin: 0; }
+.card dt { font-size: 12px; color: var(--muted); margin-top: 8px; }
+.card dd { margin: 0; }
+.card .review { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.card .review b { color: var(--accent); font-weight: 600; }
+.roles { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 0; padding: 0; list-style: none; }
+.roles li { margin: 0; background: var(--bg-soft); border-radius: 6px; padding: 0 7px; font-size: 12px; color: var(--ink-2); }
+.roles li::marker { content: ""; }
+
+/* tables */
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.65; }
+th, td { text-align: left; vertical-align: top; padding: 12px 14px 12px 0; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; color: var(--ink); font-size: 13px; border-bottom-color: #CFCBBE; }
+td:first-child { color: var(--ink); }
+tr { break-inside: avoid; page-break-inside: avoid; }
+
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+.note { background: var(--bg-soft); border-radius: 10px; padding: 14px 18px; margin-top: 20px; font-size: 15px; }
+.note b { color: var(--ink); }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+
+@media (max-width: 860px) {
+  .flow { grid-template-columns: 1fr; gap: 28px; }
+  .flow > li:not(:last-child)::after { content: "\2193"; right: auto; left: 50%; top: auto; bottom: -24px; }
+  .two, .cols { grid-template-columns: 1fr; gap: 0; }
+}
+@media (max-width: 640px) {
+  body { font-size: 15px; }
+  .wrap { padding: 0 18px 56px; }
+  header { padding-top: 36px; }
+  h1 { font-size: 1.7rem; }
+  .three { grid-template-columns: 1fr; }
+  table { font-size: 14px; }
+}
+@media print {
+  body { background: #fff; color: #000; font-size: 11pt; }
+  .banner, .note { background: #fff; border: 1px solid #ccc; }
+  .wrap { max-width: none; padding: 0; }
+  section { padding-top: 24px; }
+  .card, tr, .note, .three div { break-inside: avoid; page-break-inside: avoid; }
+  h2, h3 { break-after: avoid; page-break-after: avoid; }
+  .flow { grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  .flow > li:not(:last-child)::after { content: "\2192"; right: -12px; left: auto; top: 18px; bottom: auto; }
+  .pill { border: 1px solid #bbb; background: #fff !important; color: #000 !important; }
+}
+</style>
+</head>
+<body>
+<div class="banner">AI 辅助生成（Claude），方案草稿，待团队确认。</div>
+<div class="wrap">
+
+<header>
+  <h1>北交大竞赛能力匹配 Agent</h1>
+  <p class="lead">一个对话式 Agent：通过问答了解学生的能力与目标，从校内 700 多条竞赛中筛出适合的几项，并给出备赛路线和时间线。竞赛信息由 Lexmount 云浏览器采集 <span class="pill plan">计划</span></p>
+  <div class="three">
+    <div><b>为谁</b><p>北京交通大学在校学生，尤其是不清楚自己适合参加哪些竞赛的同学。</p></div>
+    <div><b>解决什么</b><p>竞赛信息只在校内教务系统（MIS）上，共 700 多条，分属不同学院、技能要求各不相同，学生难以判断。</p></div>
+    <div><b>产出什么</b><p>网页 Demo <span class="pill plan">计划</span>：推荐竞赛及理由、备赛路线、可导出的时间线（<code>.ics</code>）。</p></div>
+  </div>
+  <p class="legend">状态标签：<span class="pill done">已完成</span> 已跑通或已开通　<span class="pill plan">计划</span> 尚未实现　<span class="pill ver">待验证</span> 能否成立尚未确认</p>
+</header>
+
+<main>
+<section id="problem">
+  <h2><span class="n">01</span>问题与用户</h2>
+  <ul>
+    <li><b>信息量大且分散：</b>700 多条记录包含往年、多轮次、多赛区，同一竞赛会重复出现。</li>
+    <li><b>信息难访问：</b>MIS 只能经校内 VPN 访问，登录需要统一身份认证和验证码。</li>
+    <li><b>判断成本高：</b>学生需要同时看清三件事：自己的技能与竞赛要求是否匹配，参赛对目标（保研、简历、兴趣、奖金）是否有价值，时间是否冲突。</li>
+    <li><b>目标用户：</b>在校学生，可单人或组队参赛。</li>
+  </ul>
+</section>
+
+<section id="approach">
+  <h2><span class="n">02</span>方案总览</h2>
+  <div class="cols">
+    <div>
+      <h3>数据怎么来</h3>
+      <ol style="margin:0;padding-left:1.3em">
+        <li><b>MIS 采集</b> <span class="pill plan">计划</span><br>用户本机连接校内 VPN，通过 Lexmount 本地隧道让云浏览器访问 MIS。用户在弹窗中手动完成登录；登录态保存到 Lexmount 持久化 context，之后并发 fork 出多个会话，遍历列表与详情页。只读，不执行报名。</li>
+        <li><b>云端补全</b> <span class="pill plan">计划</span><br>云浏览器（不经隧道）搜索竞赛名，打开官网、往届通知和获奖公示，抽取知识要求、难度证据和赛程。每条信息附来源 URL；取不到的标「未说明」。</li>
+        <li><b>去重与优先级</b><br>按名称归一化得到「竞赛」实体，再筛出近期可报名的；补全顺序为近期可报名 → A/B 类 → 其余。</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Agent 怎么用</h3>
+      <ul>
+        <li><b>多轮筛选 R0–R4：</b>每轮 Agent 给出草案，用户可修改后进入下一轮（见下节）。</li>
+        <li><b>R3 多 Agent 讨论</b> <span class="pill plan">计划</span>：6 个角色讨论；用户可旁听、勾选参与角色，并随时插话，插话在下一位发言前注入上下文。</li>
+        <li><b>设计原则：</b>权重不是固定公式，而是「Agent 提草案 → 用户修正」。规则只处理硬性条件（报名窗口、年级限制）；其余维度用「档位 + 证据 + 置信度」表示，不压缩成一个总分。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="flow">
+  <h2><span class="n">03</span>多轮筛选流程 R0–R4</h2>
+  <p>候选竞赛逐轮收窄：<b style="color:var(--ink)">700 → 约 40 → 10–15 → 2–3 套组合</b>。每一轮结束都有用户 review。</p>
+  <ol class="flow">
+    <li><div class="card">
+      <span class="tag">R0</span>
+      <h3>画像访谈</h3>
+      <div class="funnel">自由文本输入</div>
+      <dl>
+        <dt>过程</dt><dd>Agent 逐步追问年级专业、技能及其证据（课程、项目、获奖）、每周可投入时间、目标偏好。</dd>
+        <dt>输出</dt><dd>画像和初始权重草案（附理由）。</dd>
+      </dl>
+      <div class="review"><b>用户 review：</b>在侧栏修改，或用一句话纠正。</div>
+    </div></li>
+    <li><div class="card">
+      <span class="tag">R1</span>
+      <h3>粗筛</h3>
+      <div class="funnel">约 700 → 约 40</div>
+      <dl>
+        <dt>过程</dt><dd>规则只剔除明确冲突的项（报名窗口、年级/学院限制），领域匹配宽松、宁可多留。</dd>
+        <dt>输出</dt><dd>按领域分组，每条一句入选理由。</dd>
+      </dl>
+      <div class="review"><b>用户 review：</b>保留、剔除或补充；被剔除的可恢复。</div>
+    </div></li>
+    <li><div class="card">
+      <span class="tag">R2</span>
+      <h3>精查</h3>
+      <div class="funnel">约 40 → 10–15</div>
+      <dl>
+        <dt>过程</dt><dd>实时调用 Lexmount 补全公开信息（先 WebFetch，失败再用云浏览器）。</dd>
+        <dt>输出</dt><dd>多维评分卡：能力差距、目标价值、时间成本、获奖可能、赛程冲突、组队需求。每维给出档位、证据链接和置信度，并标出在不同权重下都靠前的「稳健推荐」。</dd>
+      </dl>
+      <div class="review"><b>用户 review：</b>用滑块或自然语言调权重，反馈同时更新画像和权重。</div>
+    </div></li>
+    <li><div class="card">
+      <span class="tag">R3 <span class="pill plan">计划</span></span>
+      <h3>多 Agent 讨论</h3>
+      <div class="funnel">10–15 → 2–3 套组合</div>
+      <ul class="roles" aria-label="讨论角色">
+        <li>能力教练</li><li>收益分析师</li><li>时间规划师</li><li>学长学姐</li><li>质疑者</li><li>主持人</li>
+      </ul>
+      <dl>
+        <dt>过程</dt><dd>各角色先独立发言，再交叉回应 1–2 轮。</dd>
+        <dt>输出</dt><dd>主持人综合为「稳妥型 / 冲刺型 / 探索型」组合，并标注仍有分歧的点。</dd>
+      </dl>
+      <div class="review"><b>用户 review：</b>旁听、插话，最后选定一套，或加约束后重新讨论。</div>
+    </div></li>
+    <li><div class="card">
+      <span class="tag">R4 <span class="pill plan">计划</span></span>
+      <h3>最终方案</h3>
+      <div class="funnel">选定 1 套组合</div>
+      <dl>
+        <dt>输出</dt><dd>竞赛及理由（附证据链接）；备赛路线（每个差距对应学什么、练什么、用什么资源、达到什么里程碑）；从报名截止和比赛日倒推的时间线。</dd>
+      </dl>
+      <div class="review"><b>用户 review：</b>对路线和节奏提出修改，Agent 重新生成。</div>
+    </div></li>
+  </ol>
+</section>
+
+<section id="lexmount">
+  <h2><span class="n">04</span>Lexmount 能力使用表</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Lexmount 能力</th><th>用在哪里</th><th>作用</th><th>状态</th></tr></thead>
+    <tbody>
+      <tr><td>云浏览器 + 本地隧道</td><td>MIS 采集</td><td>不暴露内网，让云浏览器访问校内系统</td><td><span class="pill done">隧道已开通（10-13）</span> <span class="pill ver">经隧道登录 MIS 待验证</span></td></tr>
+      <tr><td>持久化 Context + fork</td><td>登录一次，并发多会话</td><td>复用登录态，并发抓取详情（Pro 25 并发）</td><td><span class="pill plan">计划</span></td></tr>
+      <tr><td>Session 下载存储</td><td>MIS 附件、官网章程 PDF/Word</td><td>取回文件后解析知识要求和赛程</td><td><span class="pill plan">计划</span></td></tr>
+      <tr><td>WebFetch</td><td>静态官网和通知页批量读取</td><td>快且省成本；失败再升级到云浏览器</td><td><span class="pill ver">待验证：接口与额度</span></td></tr>
+      <tr><td>云浏览器（normal / light）</td><td>搜索引擎、JS 渲染页面</td><td>处理需要交互的页面；light 模式效果待验证</td><td><span class="pill ver">待验证</span></td></tr>
+      <tr><td>录制回放 + 会话记录</td><td>所有云端会话</td><td>过程证据，Demo 录屏可引用</td><td><span class="pill plan">计划</span></td></tr>
+      <tr><td>Agent 实时调用</td><td>讨论阶段核实争议点</td><td>例如「今年还办吗」「去年什么题型」，结论附现场证据</td><td><span class="pill plan">计划</span></td></tr>
+      <tr><td>CLI + Skill</td><td>队友本地用 Claude Code 探索 MIS 和官网结构</td><td>提高开发效率，作为工具分工写入投稿</td><td><span class="pill plan">计划</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="evaluation">
+  <h2><span class="n">05</span>评估方法与可信性</h2>
+  <div class="cols">
+    <div>
+      <h3>证据链</h3>
+      <ul>
+        <li>每个云端会话开启录制（persistent），每条数据记录 session ID、来源 URL 和读取时间。</li>
+        <li>Lexmount 控制台可回放会话；Demo 录屏引用对应会话。</li>
+        <li>每轮的输入、输出和用户反馈写入会话日志，供复查。</li>
+      </ul>
+    </div>
+    <div>
+      <h3>检验 <span class="pill plan">计划</span></h3>
+      <ul>
+        <li><b>抽检：</b>公开信息补全后，人工抽检 30 条，逐条与来源页面比对，记录错误。</li>
+        <li><b>分档检查：</b>用 3 份虚构画像（编程强、数学强、零基础）检查评分卡的档位是否合理；硬性排除只依据明确冲突。</li>
+        <li><b>真实用户试用：</b>3–5 位同学试用，对比他们自己的判断，记录分歧和修正。</li>
+        <li><b>如实记录：</b>抽检表和试用反馈中的错误、失败和未解决的问题都保留在材料中，不做删减。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="scoring">
+  <h2><span class="n">06</span>与评分四项的对应</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th style="width:16%">评分项</th><th>本项目如何体现</th></tr></thead>
+    <tbody>
+      <tr><td>问题具体</td><td>对象明确（北交大在校学生），痛点具体（700 多条竞赛、校内系统访问受限、信息分散、判断成本高）。输出为可核对的推荐、路线和时间线。</td></tr>
+      <tr><td>过程可信</td><td>云端会话有 session ID 和录制回放，每条数据有来源 URL；会话日志记录每轮输入输出；抽检表和试用反馈可对照。</td></tr>
+      <tr><td>结果有价值</td><td>计划产出 2–3 套组合方案和备赛路线；以真实学生试用对比判断。<span class="pill ver">试用效果待验证</span>，不预先下结论。</td></tr>
+      <tr><td>做法可借鉴</td><td>能力分工表（采集、补全、讨论时实时核实）；分层抓取（WebFetch → 云浏览器）；「Agent 提草案、用户修正」的权重设计；规则只管硬条件；稳健性提示。</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="note"><b>适用限制：</b>公开信息可能不全，缺失处标「未说明」；依赖本机校内 VPN 和 Lexmount 本地隧道；只服务本人账号的只读采集；推荐结果是辅助参考，不替代学院或老师的判断。</div>
+</section>
+
+<section id="timeline">
+  <h2><span class="n">07</span>时间线与当前进展</h2>
+  <p><b style="color:var(--ink)">团队与分工：</b>团队 2–3 人。A 采集与云端，B Agent 与评分，C Demo、材料与用户测试。</p>
+  <p><b style="color:var(--ink)">范围优先级：</b>先打通 R0 → R1 → R2 → R4 主线；R3 多 Agent 讨论与插话计划在第二周接入，时间不够时先只做精简模式（支持方 + 质疑者 + 主持人）。</p>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th style="width:15%">日期</th><th>内容</th><th style="width:14%">负责</th></tr></thead>
+    <tbody>
+      <tr><td>10-14</td><td>决策门槛：隧道可用；弹窗登录后持久化 context 保留登录态；采到 1 页竞赛列表；云端必应搜索跑通 1 个竞赛；DeepSeek 工具调用跑通；领取 Pro、查看投稿表单</td><td>A、B、C</td></tr>
+      <tr><td>10-15～16</td><td>全量采集与去重；评分规则和画像结构</td><td>A；B</td></tr>
+      <tr><td>10-16～19</td><td>公开信息补全，人工抽检 30 条；Agent 对话流与工具</td><td>A；B</td></tr>
+      <tr><td>10-18～21</td><td>网页 Demo</td><td>C（B 协助）</td></tr>
+      <tr><td>10-21～23</td><td>3–5 位同学真实试用，记录分歧与修正</td><td>C</td></tr>
+      <tr><td>10-23～24</td><td>脱敏日志、session 回放、抽检表、2–3 分钟录屏；10-24 提交</td><td>全员</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p style="margin-top:14px">计划提交 10-24；赛事截止为 10-25 23:59（北京时间）。</p>
+
+  <div class="cols">
+    <div>
+      <h3>当前进展（10-13）</h3>
+      <ul>
+        <li><span class="pill done">已跑通</span> Lexmount 云浏览器冒烟测试（创建会话、打开网页、关闭会话）；本地隧道开通成功。</li>
+        <li><span class="pill done">已摸清</span> MIS 登录路径（统一身份认证 → 教务系统单点登录）、竞赛列表与详情页结构（含级别、A/B/C 类型、报名时间等字段）。</li>
+      </ul>
+    </div>
+    <div>
+      <h3>失败兜底</h3>
+      <ul>
+        <li><b>经隧道访问 MIS 不稳定：</b>先用本地浏览器工具采集 MIS，云端只负责补全，并在材料中如实说明。</li>
+        <li><b>弹窗登录无法交互：</b>改为截图验证码，由用户在终端输入答案。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="compliance">
+  <h2><span class="n">08</span>合规与边界</h2>
+  <ul>
+    <li>只使用本人账号访问，只读、低频；不执行报名操作。</li>
+    <li>登录与验证环节由用户本人在弹窗中完成，脚本不代填。</li>
+    <li>不使用官方代理绕过站点规则，不做自动验证码处理。</li>
+    <li>公开材料中对姓名等个人信息打码；负责人姓名不保存；不公开 MIS 原始数据全集。</li>
+    <li>用户的描述信息只发送给所用的大模型服务（DeepSeek），不对外公开。</li>
+  </ul>
+  <div class="note"><b>待验证事项：</b>经隧道登录与采集 MIS；WebFetch 与云浏览器 light 模式的接口和额度。</div>
+</section>
+</main>
+
+<footer>AI 辅助生成（Claude），方案草稿，待团队确认。内容整理自 project-brief.md。</footer>
+</div>
+</body>
+</html>
