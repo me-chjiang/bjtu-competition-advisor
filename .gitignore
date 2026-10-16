@@ -12,3 +12,10 @@ data/
 .DS_Store
 # Claude Code 个人本地设置
 .claude/settings.local.json
+# 前端构建产物与本地环境
+frontend/dist/
+frontend/.env.local
+# Python 后端虚拟环境与缓存
+backend/.venv/
+__pycache__/
+.pytest_cache/
