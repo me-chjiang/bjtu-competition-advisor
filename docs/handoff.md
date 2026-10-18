@@ -1,6 +1,6 @@
-# 交接：进度与待办（2026-10-15）
+# 交接：进度与待办（2026-10-18）
 
-> AI 辅助生成（Claude Code / OpenCode），根据截至 10-15 的工作记录和用户讨论整理；后端方向已更新，相关功能尚未实现。
+> AI 辅助生成（Claude Code / OpenCode），截至 10-18：隔离工作区 Task 1–5 已实施并通过分任务独立审查；完整 HTTP 主线最新离线验证为 391 passed，整体验收审查待完成。离线模拟通过不等于真实模型/SDK/MIS 已验收；审查通过后由控制者正常 GPG 提交，不自动 push。
 
 截止：2026-10-25 23:59（北京时间），计划 10-24 提交。方案见 `docs/plan.md`，原定 10-14 的决策门槛目前只完成了一部分。
 
@@ -10,7 +10,7 @@
 |---|---|---|
 | 比赛规则、资源、API 调研 | 完成 | `lexmount-real-task-challenge.md` |
 | 选题与方案 | 10-13 确认 | `docs/plan.md` |
-| 轻量后端技术方向 | 10-15 用户明确采用 Python + LiteLLM、Lexmount Python SDK；FastAPI 和本地 JSON 为合并的实现建议，尚未实现 | `docs/plan.md`「后端方案」 |
+| 轻量后端主线 | Python + FastAPI + LiteLLM + JSON 已实现；Task 1–5 分任务审查通过，Python Lexmount SDK 尚未接入 | `backend/`、`README.md` |
 | Lexmount 云浏览器冒烟测试 | 10-13 通过（创建会话 → 打开网页 → 关闭） | `scripts/smoke-test.mjs` |
 | Lexmount 本地隧道 | 10-13 开通成功，项目已有 `custom_proxy` 权限 | `lib/lexmount.mjs` 的 `withTunnel()` |
 | MIS 登录路径与页面结构 | 10-13 用本地 Playwright 实测 | `教务系统/login-and-competition-guide.md` |
@@ -29,12 +29,14 @@
 - [ ] `enrich/fetch.mjs`：分层抓取，先用 WebFetch，失败再用云浏览器；用必应搜索补全竞赛官网和章程。WebFetch 的接口和额度待确认。
 
 ### B：Agent 与评分
+- 10-18：用户已批准[实现计划](superpowers/plans/2026-10-18-backend-mvp.md)。Task 1–5 分任务独立审查通过，整体验收审查待完成。可选 `weekly_hours` 与 `additional_context` 已纳入源码/OpenAPI；无预算不阻止画像确认/筛选，但 unknown 路线不可最终确认。
 - 后端由本次讨论的用户主要负责，采用 Python + FastAPI + LiteLLM + Lexmount Python SDK；详见 `docs/plan.md`「后端方案」。单进程、单 Agent、本地 JSON，不引入 PostgreSQL、Redis 或独立 Worker。
-- [ ] 确认模型 key 的安全读取方式，搭建 `backend/`，通过 LiteLLM 跑通结构化输出和工具调用；不再开发原计划的 `lib/deepseek.mjs`。
-- [ ] 按 [LLM 对接约定](llm-integration.md) 验证异步请求、tool_call_id 回传、JSON 校验、超时与重试预算；文档示例不等于真实接口已经跑通。
-- [ ] 用少量审核数据跑通 R0 访谈 → R1 粗筛 → R2 证据卡片 → R4 路线，并支持用户修改和确认。
+- [x] `backend/`、环境/显式 YAML 配置、工具循环、schema、目录规则、原子存储已实施并经 Task 1–4 独立审查；默认 app 不自动读 YAML，缺 key 只在 chat 明确报错。安装/启动见 README。
+- [x] Task 5 独立审查与修复复审：HTTP R0 → R1 → R2 → R4、用户修改/确认、重启重放、失败/取消/写盘异常、越权 fake 及 OpenAPI。候选重生成保留用户决定的修复已复审通过；最新 HTTP 聚焦 **50 passed**、控制者完整 pytest **391 passed**，Ruff check / format --check / diff --check 通过。实施阶段的隔离单 worker Uvicorn 本机 HTTP 冒烟通过。报告保存在本工作区 `.superpowers/sdd/2026-10-18-backend-mvp/task-5-report.md`（临时材料未提交）。整体验收审查与真实联网验收仍另行开展。
+- [ ] 按 [LLM 对接约定](llm-integration.md) 执行真实 provider 的工具/JSON、时延、费用和质量验收；离线测试包含异步、tool_call_id、引用/预算/错误与 SDK 本地 mock 日志隐私回归，不是联网证明。
+- [ ] 用少量人工审核的真实竞赛数据复验主线；目前 HTTP 闭环只使用 tmp_path 虚构目录和 ScriptedAgent。
 - [ ] 与采集侧约定竞赛实例、通知和证据的 JSON 格式；首轮建议深度验证 30–50 个实例，不把约 700 条原始记录等同于不同竞赛。
-- [ ] 用 Python 函数检查资格、每周工时和日期冲突，补充工具失败、引用和会话恢复测试。
+- [x] Python 资格/报名时效/日期证据/每周负载与冲突规则，以及工具失败/引用/JSON 恢复已离线验证；HTTP 事务/确认连接已通过 Task 5 独立审查。
 - [ ] 在主线稳定后接入 Lexmount Python SDK 在线补全；`.ics` 和流式输出按 MVP 决策安排。R3、实时插话和复杂权重滑块后置，不作为主线前置条件。
 - 现有 Node 采集脚本保留；Python 后端 SDK 接入不等于采集脚本已迁移或已经验证。
 
@@ -42,7 +44,7 @@
 - [ ] 用活动页报名，领取 2 个月 Pro（Free 只有 3 个并发，Browser hours 也少）。
 - [ ] 登录投稿页，查看表单字段（未登录时看不到）。
 - [ ] 独立前端通过 FastAPI HTTP 接口对接（对话、画像编辑、候选保留/排除/恢复、阶段确认、结果与证据展示）；不再依赖原方案的 `web/server.mjs`，前端框架待定。
-- [ ] 按 [前后端契约](frontend-contract.md) 先用虚构样例 mock；联调检查版本冲突、重复请求、画像修改后旧结果失效及统一错误提示。API base URL 为 `http://127.0.0.1:8000/api`，接口待实现。
+- [ ] 按 [前后端契约](frontend-contract.md) 进行独立前端联调：版本冲突、重复请求、画像/候选修改后失效、错误提示。API base URL 为 `http://127.0.0.1:8000/api`，本地入口已实现并通过 Task 5 独立审查；`/openapi.json` 可查字段。日历固定 501，不显示入口。
 - [ ] `docs/project-overview.html`：10-15 决定暂不审核，先保持现状。
 - [ ] 评估：
   - 人工抽检 30 条；

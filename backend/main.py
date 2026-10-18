@@ -1,4 +1,4 @@
-"""Basic FastAPI session API; AI-assisted from docs/frontend-contract.md.
+"""FastAPI recommendation API; AI-assisted from docs/frontend-contract.md.
 
 Import creates an app object only. No private YAML or session data is read and
 no directories are written until an explicit session operation needs them.
@@ -16,12 +16,16 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from backend.agent import LiteLLMAgent
 from backend.catalog import CompetitionCatalog
 from backend.config import Settings
 from backend.schemas import (
     AgentRunner,
     AppError,
+    CandidatePatchRequest,
+    ChatRequest,
     CompetitionDetail,
+    ConfirmRequest,
     CreateSessionRequest,
     ErrorDetail,
     ErrorResponse,
@@ -30,8 +34,14 @@ from backend.schemas import (
 )
 from backend.service import SessionService
 from backend.storage import SessionStore
+from backend.tools import ToolRegistry
 
 logger = logging.getLogger(__name__)
+
+
+def _errors(*codes: int) -> dict[int, dict]:
+    """Document the same safe envelope the exception handlers actually return."""
+    return {code: {"model": ErrorResponse} for code in codes}
 
 
 def _error_response(error: AppError) -> JSONResponse:
@@ -90,13 +100,17 @@ def create_app(
     clock: Callable[[], datetime] | None = None,
 ) -> FastAPI:
     settings = settings if settings is not None else Settings.from_sources(os.environ, None)
+    catalog = CompetitionCatalog(settings.catalog_path)
+    runner = (
+        agent if agent is not None else LiteLLMAgent(settings, ToolRegistry(catalog, clock=clock))
+    )
     service = SessionService(
         SessionStore(settings.data_dir / "sessions", boundary=settings.data_dir),
-        agent,
-        catalog=CompetitionCatalog(settings.catalog_path),
+        runner,
+        catalog=catalog,
         clock=clock,
     )
-    application = FastAPI(debug=False)
+    application = FastAPI(debug=False, responses=_errors(422, 500))
     application.state.settings = settings
     application.state.service = service
     # Last added middleware runs outermost: CORS must see the safe 500 response.
@@ -131,15 +145,65 @@ def create_app(
     async def create_session(body: CreateSessionRequest) -> SessionSnapshot:
         return service.create_session()
 
-    @application.get("/api/sessions/{session_id}", response_model=SessionSnapshot)
+    @application.get(
+        "/api/sessions/{session_id}",
+        response_model=SessionSnapshot,
+        responses=_errors(404),
+    )
     async def get_session(session_id: str) -> SessionSnapshot:
         return service.get_session(session_id)
 
-    @application.patch("/api/sessions/{session_id}/profile", response_model=SessionSnapshot)
+    @application.patch(
+        "/api/sessions/{session_id}/profile",
+        response_model=SessionSnapshot,
+        responses=_errors(404, 409),
+    )
     async def patch_profile(session_id: str, body: ProfilePatchRequest) -> SessionSnapshot:
         return await service.patch_profile(session_id, body)
 
-    @application.get("/api/competitions/{instance_id}", response_model=CompetitionDetail)
+    @application.post(
+        "/api/sessions/{session_id}/chat",
+        response_model=SessionSnapshot,
+        responses=_errors(404, 409, 429, 502, 503, 504),
+    )
+    async def chat(session_id: str, body: ChatRequest) -> SessionSnapshot:
+        return await service.chat(session_id, body)
+
+    @application.patch(
+        "/api/sessions/{session_id}/candidates/{candidate_id}",
+        response_model=SessionSnapshot,
+        responses=_errors(404, 409, 503),
+    )
+    async def patch_candidate(
+        session_id: str,
+        candidate_id: str,
+        body: CandidatePatchRequest,
+    ) -> SessionSnapshot:
+        return await service.patch_candidate(session_id, candidate_id, body)
+
+    @application.post(
+        "/api/sessions/{session_id}/confirm",
+        response_model=SessionSnapshot,
+        responses=_errors(404, 409, 503),
+    )
+    async def confirm(session_id: str, body: ConfirmRequest) -> SessionSnapshot:
+        return await service.confirm(session_id, body)
+
+    @application.get(
+        "/api/sessions/{session_id}/calendar.ics",
+        status_code=501,
+        response_model=ErrorResponse,
+        responses=_errors(404),
+    )
+    async def calendar(session_id: str) -> None:
+        service.get_session(session_id)
+        raise AppError("FEATURE_NOT_ENABLED", "日历导出尚未启用。", 501)
+
+    @application.get(
+        "/api/competitions/{instance_id}",
+        response_model=CompetitionDetail,
+        responses=_errors(404, 503),
+    )
     async def get_competition(instance_id: str) -> CompetitionDetail:
         return service.get_competition(instance_id)
 

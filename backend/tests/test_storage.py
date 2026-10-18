@@ -23,10 +23,19 @@ def test_create_and_reload_private_record(tmp_path):
     assert not json.loads(path.read_text())["snapshot"]["processing"]
 
 
-@pytest.mark.parametrize("session_id", [
-    "../outside", "/tmp/outside", "a" * 31, "A" * 32, "g" * 32,
-    "a" * 32 + "\n", "a" * 32 + "/../../outside", "",
-])
+@pytest.mark.parametrize(
+    "session_id",
+    [
+        "../outside",
+        "/tmp/outside",
+        "a" * 31,
+        "A" * 32,
+        "g" * 32,
+        "a" * 32 + "\n",
+        "a" * 32 + "/../../outside",
+        "",
+    ],
+)
 async def test_session_id_cannot_escape_root(tmp_path, session_id):
     root = tmp_path / "sessions"
     store = SessionStore(root)

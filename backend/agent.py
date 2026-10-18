@@ -14,7 +14,6 @@ from collections.abc import Awaitable, Callable
 from time import monotonic
 from typing import Any
 
-from jsonschema import Draft202012Validator, FormatChecker
 from pydantic import ValidationError
 
 from backend.catalog import _applicable, assess_competition, check_eligibility
@@ -557,6 +556,9 @@ class LiteLLMAgent:
 
     @staticmethod
     def _calls(calls: list, definitions: list[dict], seen: set[str]) -> list[tuple[dict, dict]]:
+        # jsonschema loads bundled schema files on import; keep app construction I/O-free.
+        from jsonschema import Draft202012Validator, FormatChecker
+
         allowed = {item["function"]["name"]: item["function"]["parameters"] for item in definitions}
         validated = []
         batch_ids: set[str] = set()

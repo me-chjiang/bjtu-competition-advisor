@@ -52,8 +52,13 @@ async def test_create_and_reload_session(client, settings):
     assert created["plan"] is None
     assert created["needs_confirmation"] is False
     assert created["profile"] == {
-        "grade": None, "major": None, "skills": [], "weekly_hours": None,
-        "goals": [], "team_preference": None, "unavailable_dates": [],
+        "grade": None,
+        "major": None,
+        "skills": [],
+        "weekly_hours": None,
+        "goals": [],
+        "team_preference": None,
+        "unavailable_dates": [],
         "additional_context": None,
     }
     assert len(created["session_id"]) == 32
@@ -69,21 +74,30 @@ async def test_profile_patch_invalidates_results(client, settings):
     store = SessionStore(settings.data_dir / "sessions")
     record = store.load(created["session_id"])
     values = record.model_dump()
-    values["snapshot"].update({
-        "stage": "R4", "status": "awaiting_review", "needs_confirmation": True,
-        "profile": Profile(major="fictional major", weekly_hours=6).model_dump(),
-        "cards": [CandidateCard(
-            competition_instance_id="fictional_2026", name="Fictional", reason="Demo only"
-        ).model_dump()],
-        "plan": Plan(selected_competition_ids=["fictional_2026"]).model_dump(),
-    })
+    values["snapshot"].update(
+        {
+            "stage": "R4",
+            "status": "awaiting_review",
+            "needs_confirmation": True,
+            "profile": Profile(major="fictional major", weekly_hours=6).model_dump(),
+            "cards": [
+                CandidateCard(
+                    competition_instance_id="fictional_2026", name="Fictional", reason="Demo only"
+                ).model_dump()
+            ],
+            "plan": Plan(selected_competition_ids=["fictional_2026"]).model_dump(),
+        }
+    )
     values["confirmed_profile"] = values["snapshot"]["profile"]
     values["coarse_cards"] = values["snapshot"]["cards"]
     store.save(SessionRecord.model_validate(values))
-    response = await client.patch(f"/api/sessions/{created['session_id']}/profile", json={
-        "expected_revision": 0,
-        "changes": {"weekly_hours": None, "additional_context": "Fictional preference"},
-    })
+    response = await client.patch(
+        f"/api/sessions/{created['session_id']}/profile",
+        json={
+            "expected_revision": 0,
+            "changes": {"weekly_hours": None, "additional_context": "Fictional preference"},
+        },
+    )
     assert response.status_code == 200
     patched = response.json()
     assert patched["revision"] == 1
@@ -126,9 +140,13 @@ async def test_busy_session_is_readable(settings):
             assert response.status_code == 200
             assert response.json()["processing"] is True
             assert response.json()["revision"] == 0
-            busy = await client.patch(f"/api/sessions/{session_id}/profile", json={
-                "expected_revision": 0, "changes": {"grade": "Demo"},
-            })
+            busy = await client.patch(
+                f"/api/sessions/{session_id}/profile",
+                json={
+                    "expected_revision": 0,
+                    "changes": {"grade": "Demo"},
+                },
+            )
             assert busy.status_code == 409
             assert busy.json()["error"]["code"] == "REQUEST_IN_PROGRESS"
             assert store.load(session_id).snapshot.processing is False
@@ -151,7 +169,8 @@ async def test_validation_error_does_not_echo_secret(client):
         {"expected_revision": 0, "changes": {"additional_context": secret * 100}},
     ]:
         response = await client.patch(
-            f"/api/sessions/{created['session_id']}/profile", json=payload,
+            f"/api/sessions/{created['session_id']}/profile",
+            json=payload,
         )
         assert response.status_code == 422
         assert response.json()["error"]["code"] == "VALIDATION_ERROR"
@@ -161,7 +180,8 @@ async def test_validation_error_does_not_echo_secret(client):
         assert "ctx" not in response.text
         assert "Traceback" not in response.text
     malformed = await client.post(
-        "/api/sessions", content='{"fictional-secret-do-not-echo":',
+        "/api/sessions",
+        content='{"fictional-secret-do-not-echo":',
         headers={"Content-Type": "application/json"},
     )
     assert malformed.status_code == 422
@@ -173,9 +193,13 @@ async def test_cors_defaults_closed(client):
         "/api/sessions", json={}, headers={"Origin": "http://localhost:5173"}
     )
     assert "access-control-allow-origin" not in response.headers
-    preflight = await client.options("/api/sessions", headers={
-        "Origin": "http://localhost:5173", "Access-Control-Request-Method": "POST",
-    })
+    preflight = await client.options(
+        "/api/sessions",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
     assert "access-control-allow-origin" not in preflight.headers
 
 
@@ -185,10 +209,14 @@ async def test_cors_allows_only_explicit_origins(settings):
         transport=httpx.ASGITransport(app=app), base_url="http://test"
     ) as client:
         for origin, allowed in [("http://localhost:5173", True), ("https://evil.example", False)]:
-            response = await client.options("/api/sessions/demo/profile", headers={
-                "Origin": origin, "Access-Control-Request-Method": "PATCH",
-                "Access-Control-Request-Headers": "content-type",
-            })
+            response = await client.options(
+                "/api/sessions/demo/profile",
+                headers={
+                    "Origin": origin,
+                    "Access-Control-Request-Method": "PATCH",
+                    "Access-Control-Request-Headers": "content-type",
+                },
+            )
             assert response.headers.get("access-control-allow-origin") == (
                 origin if allowed else None
             )
@@ -234,15 +262,23 @@ async def test_internal_errors_are_safe_and_release_lock(settings, monkeypatch, 
         assert all(record.exc_info is None for record in caplog.records)
         assert not store.is_processing(record.snapshot.session_id)
         assert store.load(record.snapshot.session_id) == previous
-        retry = await client.patch(f"/api/sessions/{record.snapshot.session_id}/profile", json={
-            "expected_revision": 0, "changes": {"major": "Demo"},
-        })
+        retry = await client.patch(
+            f"/api/sessions/{record.snapshot.session_id}/profile",
+            json={
+                "expected_revision": 0,
+                "changes": {"major": "Demo"},
+            },
+        )
         assert retry.status_code == 200
 
 
-@pytest.mark.parametrize("origin,allowed", [
-    ("http://localhost:5173", True), ("https://evil.example", False),
-])
+@pytest.mark.parametrize(
+    "origin,allowed",
+    [
+        ("http://localhost:5173", True),
+        ("https://evil.example", False),
+    ],
+)
 async def test_unexpected_error_keeps_cors_policy(settings, monkeypatch, origin, allowed):
     app = create_app(settings.model_copy(update={"allowed_origins": ["http://localhost:5173"]}))
     store = app.state.service.store
@@ -255,8 +291,13 @@ async def test_unexpected_error_keeps_cors_policy(settings, monkeypatch, origin,
     # Raw ASGI records both headers and exception propagation, without suppressing either.
     payload = json.dumps({"expected_revision": 0, "changes": {"major": "Demo"}}).encode()
     scope = {
-        "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1",
-        "method": "PATCH", "scheme": "http", "query_string": b"", "root_path": "",
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "PATCH",
+        "scheme": "http",
+        "query_string": b"",
+        "root_path": "",
         "path": f"/api/sessions/{record.snapshot.session_id}/profile",
         "headers": [(b"origin", origin.encode()), (b"content-type", b"application/json")],
     }
@@ -322,13 +363,25 @@ async def test_uvicorn_error_path_never_logs_original_exception(settings, monkey
     logger = logging.getLogger("task2.test-server")
     cycle = RequestResponseCycle(
         scope={
-            "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1",
-            "method": "PATCH", "scheme": "http", "query_string": b"", "root_path": "",
-            "path": path, "headers": [(b"content-type", b"application/json")],
+            "type": "http",
+            "asgi": {"version": "3.0"},
+            "http_version": "1.1",
+            "method": "PATCH",
+            "scheme": "http",
+            "query_string": b"",
+            "root_path": "",
+            "path": path,
+            "headers": [(b"content-type", b"application/json")],
         },
-        conn=connection, transport=transport, flow=FlowControl(transport), logger=logger,
-        access_logger=logger, access_log=False, default_headers=[],
-        message_event=asyncio.Event(), on_response=lambda: None,
+        conn=connection,
+        transport=transport,
+        flow=FlowControl(transport),
+        logger=logger,
+        access_logger=logger,
+        access_log=False,
+        default_headers=[],
+        message_event=asyncio.Event(),
+        on_response=lambda: None,
     )
     cycle.body = bytearray(body)
     cycle.more_body = False
@@ -392,9 +445,12 @@ async def test_internal_caches_never_leak(client, settings):
     record.confirmed_profile = Profile(major="fictional-private-confirmed")
     record.successful_requests["private-cache"] = SuccessfulRequest(
         request=ChatRequest(
-            request_id="private-cache", expected_revision=0, action="message",
+            request_id="private-cache",
+            expected_revision=0,
+            action="message",
             content="fictional-private-cache",
-        ), snapshot=record.snapshot,
+        ),
+        snapshot=record.snapshot,
     )
     store.save(record)
     response = await client.get(f"/api/sessions/{created['session_id']}")
@@ -443,7 +499,10 @@ print("import-safe")
             "DEEPSEEK_API_KEY": "fictional-import-key",
             "PYTHONDONTWRITEBYTECODE": "1",
         },
-        capture_output=True, text=True, timeout=30, check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "import-safe"
@@ -452,9 +511,13 @@ print("import-safe")
 
 async def test_noop_patch_preserves_revision(client):
     created = (await client.post("/api/sessions", json={})).json()
-    response = await client.patch(f"/api/sessions/{created['session_id']}/profile", json={
-        "expected_revision": 0, "changes": {"additional_context": "   "},
-    })
+    response = await client.patch(
+        f"/api/sessions/{created['session_id']}/profile",
+        json={
+            "expected_revision": 0,
+            "changes": {"additional_context": "   "},
+        },
+    )
     assert response.status_code == 200
     assert response.json() == created
 
@@ -463,23 +526,36 @@ async def test_noop_patch_preserves_valid_results_and_internal_state(client, set
     created = (await client.post("/api/sessions", json={})).json()
     store = SessionStore(settings.data_dir / "sessions")
     values = store.load(created["session_id"]).model_dump()
-    values["snapshot"].update({
-        "revision": 8, "stage": "R4", "status": "awaiting_review", "needs_confirmation": True,
-        "profile": Profile(major="Fictional", weekly_hours=6).model_dump(),
-        "cards": [CandidateCard(
-            competition_instance_id="fictional_2026", name="Fictional", reason="Demo only",
-        ).model_dump()],
-        "plan": Plan(selected_competition_ids=["fictional_2026"]).model_dump(),
-    })
+    values["snapshot"].update(
+        {
+            "revision": 8,
+            "stage": "R4",
+            "status": "awaiting_review",
+            "needs_confirmation": True,
+            "profile": Profile(major="Fictional", weekly_hours=6).model_dump(),
+            "cards": [
+                CandidateCard(
+                    competition_instance_id="fictional_2026",
+                    name="Fictional",
+                    reason="Demo only",
+                ).model_dump()
+            ],
+            "plan": Plan(selected_competition_ids=["fictional_2026"]).model_dump(),
+        }
+    )
     values["confirmed_profile"] = values["snapshot"]["profile"]
     values["coarse_cards"] = values["snapshot"]["cards"]
     store.save(SessionRecord.model_validate(values))
     before = (await client.get(f"/api/sessions/{created['session_id']}")).json()
     path = settings.data_dir / "sessions" / f"{created['session_id']}.json"
     previous_bytes = path.read_bytes()
-    response = await client.patch(f"/api/sessions/{created['session_id']}/profile", json={
-        "expected_revision": 8, "changes": {"weekly_hours": 6},
-    })
+    response = await client.patch(
+        f"/api/sessions/{created['session_id']}/profile",
+        json={
+            "expected_revision": 8,
+            "changes": {"weekly_hours": 6},
+        },
+    )
     assert response.status_code == 200
     assert response.json() == before
     assert path.read_bytes() == previous_bytes
@@ -492,9 +568,13 @@ async def test_corrupt_file_returns_safe_error_without_replacement(client, setti
     previous = path.read_bytes()
     for response in [
         await client.get(f"/api/sessions/{created['session_id']}"),
-        await client.patch(f"/api/sessions/{created['session_id']}/profile", json={
-            "expected_revision": 0, "changes": {"major": "Demo"},
-        }),
+        await client.patch(
+            f"/api/sessions/{created['session_id']}/profile",
+            json={
+                "expected_revision": 0,
+                "changes": {"major": "Demo"},
+            },
+        ),
     ]:
         assert response.status_code == 500
         assert response.json()["error"]["code"] == "INTERNAL_ERROR"

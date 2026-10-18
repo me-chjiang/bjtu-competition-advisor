@@ -61,9 +61,14 @@ class Settings(BaseModel):
         for origin in origins:
             parsed = urlsplit(origin)
             if (
-                parsed.scheme not in {"http", "https"} or not parsed.hostname
-                or parsed.username is not None or parsed.password is not None
-                or parsed.path or parsed.query or parsed.fragment or "*" in origin
+                parsed.scheme not in {"http", "https"}
+                or not parsed.hostname
+                or parsed.username is not None
+                or parsed.password is not None
+                or parsed.path
+                or parsed.query
+                or parsed.fragment
+                or "*" in origin
             ):
                 raise ValueError("CORS requires explicit HTTP(S) origins without paths.")
             # Accessing port also rejects malformed or out-of-range ports.
@@ -72,7 +77,9 @@ class Settings(BaseModel):
 
     @classmethod
     def from_sources(
-        cls, environ: Mapping[str, str], config_path: Path | None,
+        cls,
+        environ: Mapping[str, str],
+        config_path: Path | None,
     ) -> "Settings":
         """Environment wins even when empty; failures never echo source values."""
         try:

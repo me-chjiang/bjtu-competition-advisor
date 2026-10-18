@@ -55,10 +55,12 @@ class SessionStore:
         session_id = uuid4().hex
         while self._path(session_id).exists():
             session_id = uuid4().hex
-        record = SessionRecord(snapshot=SessionSnapshot(
-            session_id=session_id,
-            message="请介绍你的专业、年级和想参加竞赛的目标。",
-        ))
+        record = SessionRecord(
+            snapshot=SessionSnapshot(
+                session_id=session_id,
+                message="请介绍你的专业、年级和想参加竞赛的目标。",
+            )
+        )
         self.save(record)
         return record
 
@@ -124,7 +126,10 @@ class SessionStore:
         # No await between testing and adding: atomic within this process's event loop.
         if session_id in self._processing:
             raise AppError(
-                "REQUEST_IN_PROGRESS", "会话正在处理中，请稍后查看。", 409, retryable=True,
+                "REQUEST_IN_PROGRESS",
+                "会话正在处理中，请稍后查看。",
+                409,
+                retryable=True,
             )
         self._processing.add(session_id)
         try:

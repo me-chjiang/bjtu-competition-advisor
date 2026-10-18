@@ -45,9 +45,7 @@ def test_profile_defaults_and_patch():
     }
     original = Profile(major="示例专业", weekly_hours=6, goals=["兴趣", "实践"])
     changes = ProfileChanges(weekly_hours=None, goals=["项目"])
-    merged = Profile.model_validate(
-        original.model_dump() | changes.model_dump(exclude_unset=True)
-    )
+    merged = Profile.model_validate(original.model_dump() | changes.model_dump(exclude_unset=True))
     assert merged.major == "示例专业"
     assert merged.weekly_hours is None
     assert merged.goals == ["项目"]
@@ -114,9 +112,7 @@ def test_chat_generate_and_message_contract():
     )
     assert len(message.content) == 4000
     with pytest.raises(ValueError):
-        ChatRequest(
-            request_id="req_demo", expected_revision=0, action="generate", content="生成"
-        )
+        ChatRequest(request_id="req_demo", expected_revision=0, action="generate", content="生成")
 
 
 @pytest.mark.parametrize("revision", [-1, True, 1.5, "1"])
@@ -137,19 +133,27 @@ def test_request_contract_enums_and_fields():
 def test_snapshot_public_shape_and_private_record_round_trip():
     snapshot = SessionSnapshot(session_id="s_demo", message="请介绍你的目标。")
     assert snapshot.model_dump(mode="json") == {
-        "session_id": "s_demo", "revision": 0, "stage": "R0", "status": "collecting",
-        "processing": False, "last_request_id": None, "message": "请介绍你的目标。",
-        "messages": [], "profile": Profile().model_dump(mode="json"), "cards": [],
-        "plan": None, "needs_confirmation": False,
+        "session_id": "s_demo",
+        "revision": 0,
+        "stage": "R0",
+        "status": "collecting",
+        "processing": False,
+        "last_request_id": None,
+        "message": "请介绍你的目标。",
+        "messages": [],
+        "profile": Profile().model_dump(mode="json"),
+        "cards": [],
+        "plan": None,
+        "needs_confirmation": False,
     }
     request = ChatRequest(
         request_id="req_demo", expected_revision=0, action="generate", content=None
     )
     record = SessionRecord(
-        snapshot=snapshot, confirmed_profile=Profile(major="示例专业"),
-        coarse_cards=[], successful_requests={
-            "req_demo": SuccessfulRequest(request=request, snapshot=snapshot)
-        },
+        snapshot=snapshot,
+        confirmed_profile=Profile(major="示例专业"),
+        coarse_cards=[],
+        successful_requests={"req_demo": SuccessfulRequest(request=request, snapshot=snapshot)},
     )
     restored = SessionRecord.model_validate_json(record.model_dump_json())
     assert restored.confirmed_profile.major == "示例专业"
@@ -168,12 +172,20 @@ def test_snapshot_confirmation_flag_matches_status():
 
 def test_evidence_dates_and_public_competition_fields():
     evidence = Evidence(
-        id="ev_demo", url="https://example.com/notice", excerpt="虚构往届通知。",
-        fetched_at="2026-10-15T12:00:00+08:00", applicable_year=2025, scope="往届校赛",
+        id="ev_demo",
+        url="https://example.com/notice",
+        excerpt="虚构往届通知。",
+        fetched_at="2026-10-15T12:00:00+08:00",
+        applicable_year=2025,
+        scope="往届校赛",
     )
     competition = CompetitionRecord(
-        competition_instance_id="ci_demo", name="虚构竞赛", year=2026,
-        allowed_grades=["大二"], allowed_majors=None, eligibility_evidence_ids=["ev_demo"],
+        competition_instance_id="ci_demo",
+        name="虚构竞赛",
+        year=2026,
+        allowed_grades=["大二"],
+        allowed_majors=None,
+        eligibility_evidence_ids=["ev_demo"],
         evidence=[evidence],
     )
     public = CompetitionDetail.model_validate(
@@ -187,7 +199,9 @@ def test_evidence_dates_and_public_competition_fields():
     assert "allowed_grades" not in public.model_dump()
 
 
-@pytest.mark.parametrize("url", ["javascript:alert(1)", "file:///private", "https://user:secret@example.com/"])
+@pytest.mark.parametrize(
+    "url", ["javascript:alert(1)", "file:///private", "https://user:secret@example.com/"]
+)
 def test_evidence_rejects_unsafe_source_links(url):
     with pytest.raises(ValueError):
         Evidence(id="ev_demo", url=url, excerpt="虚构", fetched_at="2026-10-15T12:00:00Z")
@@ -205,8 +219,12 @@ def test_internal_draft_cannot_set_server_rules_or_authority():
     assert draft.plan is None
     assert draft.profile_changes.model_fields_set == {"weekly_hours"}
     for field, value in {
-        "revision": 7, "session_id": "s_fake", "permissions": ["admin"],
-        "confirm": True, "needs_confirmation": True, "stage": "R4",
+        "revision": 7,
+        "session_id": "s_fake",
+        "permissions": ["admin"],
+        "confirm": True,
+        "needs_confirmation": True,
+        "stage": "R4",
     }.items():
         with pytest.raises(ValueError):
             AgentDraft(kind="question", message="示例", **{field: value})
@@ -217,7 +235,9 @@ def test_internal_draft_cannot_set_server_rules_or_authority():
 
 def test_plan_unknowns_and_positive_hours():
     task = PlanTask(
-        id="t_demo", competition_instance_id="ci_demo", title="虚构任务",
+        id="t_demo",
+        competition_instance_id="ci_demo",
+        title="虚构任务",
         acceptance_criteria="完成示例",
     )
     plan = Plan(selected_competition_ids=["ci_demo"], tasks=[task])
@@ -232,26 +252,41 @@ def test_plan_unknowns_and_positive_hours():
             PlanTask(**{**task.model_dump(), "estimated_hours": value})
 
 
-@pytest.mark.parametrize("model,kwargs", [
-    (CreateSessionRequest, {}), (Profile, {}), (ProfileChanges, {}),
-    (Skill, {"name": "Python", "evidence": None}),
-    (ChatRequest, {
-        "request_id": "r", "expected_revision": 0, "action": "generate", "content": None,
-    }),
-    (ProfilePatchRequest, {"expected_revision": 0, "changes": {}}),
-    (CandidatePatchRequest, {"expected_revision": 0, "decision": "defer"}),
-    (ConfirmRequest, {"expected_revision": 0, "stage": "R0"}),
-    (SessionSnapshot, {"session_id": "s_demo"}),
-    (CandidateCard, {"competition_instance_id": "ci_demo", "name": "虚构竞赛", "reason": "示例"}),
-    (Dimension, {"name": "ability_gap", "assessment": "未知", "basis": "unknown"}),
-    (CandidateReason, {"competition_instance_id": "ci_demo", "reason": "示例"}),
-    (AnalysisDraft, {"competition_instance_id": "ci_demo", "dimensions": []}),
-    (PlanDraft, {}), (Plan, {}),
-    (AgentDraft, {"kind": "question", "message": "示例"}),
-    (CompetitionDetail, {"competition_instance_id": "ci_demo", "name": "示例"}),
-    (ErrorDetail, {"code": "INTERNAL_ERROR", "message": "操作失败"}),
-    (ErrorResponse, {"error": {"code": "INTERNAL_ERROR", "message": "操作失败"}}),
-])
+@pytest.mark.parametrize(
+    "model,kwargs",
+    [
+        (CreateSessionRequest, {}),
+        (Profile, {}),
+        (ProfileChanges, {}),
+        (Skill, {"name": "Python", "evidence": None}),
+        (
+            ChatRequest,
+            {
+                "request_id": "r",
+                "expected_revision": 0,
+                "action": "generate",
+                "content": None,
+            },
+        ),
+        (ProfilePatchRequest, {"expected_revision": 0, "changes": {}}),
+        (CandidatePatchRequest, {"expected_revision": 0, "decision": "defer"}),
+        (ConfirmRequest, {"expected_revision": 0, "stage": "R0"}),
+        (SessionSnapshot, {"session_id": "s_demo"}),
+        (
+            CandidateCard,
+            {"competition_instance_id": "ci_demo", "name": "虚构竞赛", "reason": "示例"},
+        ),
+        (Dimension, {"name": "ability_gap", "assessment": "未知", "basis": "unknown"}),
+        (CandidateReason, {"competition_instance_id": "ci_demo", "reason": "示例"}),
+        (AnalysisDraft, {"competition_instance_id": "ci_demo", "dimensions": []}),
+        (PlanDraft, {}),
+        (Plan, {}),
+        (AgentDraft, {"kind": "question", "message": "示例"}),
+        (CompetitionDetail, {"competition_instance_id": "ci_demo", "name": "示例"}),
+        (ErrorDetail, {"code": "INTERNAL_ERROR", "message": "操作失败"}),
+        (ErrorResponse, {"error": {"code": "INTERNAL_ERROR", "message": "操作失败"}}),
+    ],
+)
 def test_dtos_forbid_extra_fields(model, kwargs):
     with pytest.raises(ValueError):
         model(**kwargs, unexpected="must not pass")
@@ -263,8 +298,10 @@ def test_controlled_error_contract():
     assert error.status_code == 409
     response = ErrorResponse(
         error=ErrorDetail(
-            code=error.code, message=error.message,
-            retryable=error.retryable, details=error.details,
+            code=error.code,
+            message=error.message,
+            retryable=error.retryable,
+            details=error.details,
         ),
         request_id="req_demo",
     )
@@ -279,13 +316,18 @@ def test_env_overrides_yaml(tmp_path):
         'deepseek-api-key: "fictional-yaml-key"\nllm-model: "deepseek/yaml-demo"\n',
         encoding="utf-8",
     )
-    settings = Settings.from_sources({
-        "DEEPSEEK_API_KEY": "fictional-env-key", "LLM_MODEL": "deepseek/env-demo",
-        "LLM_TIMEOUT_SECONDS": "12.5", "LLM_MAX_OUTPUT_TOKENS": "1024",
-        "BJTU_DATA_DIR": str(tmp_path / "data"),
-        "BJTU_CATALOG_PATH": str(tmp_path / "catalog.json"),
-        "BJTU_ALLOWED_ORIGINS": "http://localhost:5173, http://127.0.0.1:5173",
-    }, config)
+    settings = Settings.from_sources(
+        {
+            "DEEPSEEK_API_KEY": "fictional-env-key",
+            "LLM_MODEL": "deepseek/env-demo",
+            "LLM_TIMEOUT_SECONDS": "12.5",
+            "LLM_MAX_OUTPUT_TOKENS": "1024",
+            "BJTU_DATA_DIR": str(tmp_path / "data"),
+            "BJTU_CATALOG_PATH": str(tmp_path / "catalog.json"),
+            "BJTU_ALLOWED_ORIGINS": "http://localhost:5173, http://127.0.0.1:5173",
+        },
+        config,
+    )
     assert settings.deepseek_api_key.get_secret_value() == "fictional-env-key"
     assert settings.llm_model == "deepseek/env-demo"
     assert settings.llm_timeout_seconds == 12.5
@@ -310,9 +352,13 @@ def test_settings_defaults_are_repo_relative_not_cwd(tmp_path, monkeypatch):
     assert settings.data_dir == root / "data"
     assert settings.catalog_path == root / "data/competitions.json"
     assert settings.allowed_origins == []
-    relative = Settings.from_sources({
-        "BJTU_DATA_DIR": "example-data", "BJTU_CATALOG_PATH": "example-catalog.json",
-    }, None)
+    relative = Settings.from_sources(
+        {
+            "BJTU_DATA_DIR": "example-data",
+            "BJTU_CATALOG_PATH": "example-catalog.json",
+        },
+        None,
+    )
     assert relative.data_dir == root / "example-data"
     assert relative.catalog_path == root / "example-catalog.json"
 
@@ -326,13 +372,20 @@ def test_secret_repr_is_redacted(tmp_path):
     assert "fictional-never-log-key" not in settings.model_dump_json()
 
 
-@pytest.mark.parametrize("name,value", [
-    ("LLM_TIMEOUT_SECONDS", "0"), ("LLM_TIMEOUT_SECONDS", "-1"),
-    ("LLM_TIMEOUT_SECONDS", "nan"), ("LLM_TIMEOUT_SECONDS", "inf"),
-    ("LLM_MAX_OUTPUT_TOKENS", "0"), ("LLM_MAX_OUTPUT_TOKENS", "-1"),
-    ("LLM_MAX_OUTPUT_TOKENS", "1.5"), ("LLM_MAX_OUTPUT_TOKENS", "true"),
-    ("LLM_TIMEOUT_SECONDS", "fictional-secret-in-invalid-limit"),
-])
+@pytest.mark.parametrize(
+    "name,value",
+    [
+        ("LLM_TIMEOUT_SECONDS", "0"),
+        ("LLM_TIMEOUT_SECONDS", "-1"),
+        ("LLM_TIMEOUT_SECONDS", "nan"),
+        ("LLM_TIMEOUT_SECONDS", "inf"),
+        ("LLM_MAX_OUTPUT_TOKENS", "0"),
+        ("LLM_MAX_OUTPUT_TOKENS", "-1"),
+        ("LLM_MAX_OUTPUT_TOKENS", "1.5"),
+        ("LLM_MAX_OUTPUT_TOKENS", "true"),
+        ("LLM_TIMEOUT_SECONDS", "fictional-secret-in-invalid-limit"),
+    ],
+)
 def test_invalid_limits_fail_safely(name, value):
     from backend.config import Settings
 
@@ -343,10 +396,14 @@ def test_invalid_limits_fail_safely(name, value):
     assert "fictional" not in repr(caught.value)
 
 
-@pytest.mark.parametrize("content", [
-    "[fictional-private-key", "- fictional-private-key",
-    "deepseek-api-key: [fictional-private-key]",
-])
+@pytest.mark.parametrize(
+    "content",
+    [
+        "[fictional-private-key",
+        "- fictional-private-key",
+        "deepseek-api-key: [fictional-private-key]",
+    ],
+)
 def test_invalid_yaml_fails_safely(tmp_path, content):
     from backend.config import Settings
 
@@ -366,9 +423,15 @@ def test_explicit_missing_config_fails_safely(tmp_path):
     assert caught.value.code == "CONFIG_INVALID"
 
 
-@pytest.mark.parametrize("origin", [
-    "*", "https://example.com/path", "https://user:password@example.com", "file:///tmp",
-])
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "*",
+        "https://example.com/path",
+        "https://user:password@example.com",
+        "file:///tmp",
+    ],
+)
 def test_origins_must_be_explicit_http_origins(origin):
     from backend.config import Settings
 
@@ -376,10 +439,15 @@ def test_origins_must_be_explicit_http_origins(origin):
         Settings.from_sources({"BJTU_ALLOWED_ORIGINS": origin}, None)
 
 
-@pytest.mark.parametrize("field,value", [
-    ("request_timeout_seconds", 121), ("max_model_calls", 6),
-    ("max_tool_calls", 9), ("llm_max_output_tokens", 4097),
-])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("request_timeout_seconds", 121),
+        ("max_model_calls", 6),
+        ("max_tool_calls", 9),
+        ("llm_max_output_tokens", 4097),
+    ],
+)
 def test_settings_cannot_raise_hard_request_budgets(field, value):
     from backend.config import Settings
 
@@ -390,13 +458,14 @@ def test_settings_cannot_raise_hard_request_budgets(field, value):
 def test_patch_explicit_context_null_and_array_replacement():
     original = Profile(additional_context="虚构经历", skills=[Skill(name="Python")])
     empty = ProfileChanges()
-    assert Profile.model_validate(
-        original.model_dump() | empty.model_dump(exclude_unset=True)
-    ).additional_context == "虚构经历"
-    patch = ProfileChanges(additional_context=None, skills=[])
-    updated = Profile.model_validate(
-        original.model_dump() | patch.model_dump(exclude_unset=True)
+    assert (
+        Profile.model_validate(
+            original.model_dump() | empty.model_dump(exclude_unset=True)
+        ).additional_context
+        == "虚构经历"
     )
+    patch = ProfileChanges(additional_context=None, skills=[])
+    updated = Profile.model_validate(original.model_dump() | patch.model_dump(exclude_unset=True))
     assert updated.additional_context is None
     assert updated.skills == []
 
