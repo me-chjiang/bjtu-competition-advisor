@@ -25,8 +25,12 @@ RegistrationStatus = Literal["open", "upcoming", "closed", "unknown"]
 Eligibility = Literal["eligible", "ineligible", "unknown"]
 Basis = Literal["explicit", "inferred", "unknown"]
 DimensionName = Literal[
-    "ability_gap", "goal_value", "time_cost", "preparation_risk",
-    "team_requirement", "schedule_conflict",
+    "ability_gap",
+    "goal_value",
+    "time_cost",
+    "preparation_risk",
+    "team_requirement",
+    "schedule_conflict",
 ]
 Revision = Annotated[int, Field(strict=True, ge=0)]
 NonemptyString = Annotated[str, Field(min_length=1)]
@@ -38,9 +42,7 @@ def _reject_boolean(value: Any) -> Any:
     return value
 
 
-PositiveHours = Annotated[
-    float, BeforeValidator(_reject_boolean), Field(gt=0, allow_inf_nan=False)
-]
+PositiveHours = Annotated[float, BeforeValidator(_reject_boolean), Field(gt=0, allow_inf_nan=False)]
 
 
 class DTO(BaseModel):
@@ -176,6 +178,14 @@ class CompetitionRecord(CompetitionDetail):
     allowed_grades: list[str] | None = None
     allowed_majors: list[str] | None = None
     eligibility_evidence_ids: list[str] = Field(default_factory=list)
+    # Absent date provenance keeps legacy internal serialization unchanged;
+    # nonempty references remain round-trippable for explicit catalog records.
+    registration_evidence_ids: list[str] = Field(
+        default_factory=list, exclude_if=lambda value: not value
+    )
+    competition_date_evidence_ids: list[str] = Field(
+        default_factory=list, exclude_if=lambda value: not value
+    )
 
 
 class PlanTask(DTO):
@@ -299,8 +309,12 @@ class AppError(Exception):
     """Controlled error; callers must pass safe messages/details, never raw exceptions."""
 
     def __init__(
-        self, code: str, message: str, status_code: int,
-        retryable: bool = False, details: dict[str, Any] | None = None,
+        self,
+        code: str,
+        message: str,
+        status_code: int,
+        retryable: bool = False,
+        details: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code

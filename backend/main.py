@@ -6,6 +6,8 @@ no directories are written until an explicit session operation needs them.
 
 import logging
 import os
+from collections.abc import Callable
+from datetime import datetime
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -14,10 +16,12 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from backend.catalog import CompetitionCatalog
 from backend.config import Settings
 from backend.schemas import (
     AgentRunner,
     AppError,
+    CompetitionDetail,
     CreateSessionRequest,
     ErrorDetail,
     ErrorResponse,
@@ -31,9 +35,14 @@ logger = logging.getLogger(__name__)
 
 
 def _error_response(error: AppError) -> JSONResponse:
-    envelope = ErrorResponse(error=ErrorDetail(
-        code=error.code, message=error.message, retryable=error.retryable, details=error.details,
-    ))
+    envelope = ErrorResponse(
+        error=ErrorDetail(
+            code=error.code,
+            message=error.message,
+            retryable=error.retryable,
+            details=error.details,
+        )
+    )
     return JSONResponse(status_code=error.status_code, content=envelope.model_dump(mode="json"))
 
 
@@ -63,18 +72,29 @@ class _SafeHTTPErrorBoundary:
             # CancelledError is a BaseException and must propagate through this boundary.
             logger.error("HTTP request failed: INTERNAL_ERROR")
             if not response_started:
-                response = _error_response(AppError(
-                    "INTERNAL_ERROR", "服务暂不可用，请稍后重试。", 500,
-                ))
+                response = _error_response(
+                    AppError(
+                        "INTERNAL_ERROR",
+                        "服务暂不可用，请稍后重试。",
+                        500,
+                    )
+                )
                 await response(scope, receive, send)
             # A response already started cannot be replaced. Do not emit a second
             # response or rethrow sensitive data; the server closes an incomplete body.
 
 
-def create_app(settings: Settings | None = None, agent: AgentRunner | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    agent: AgentRunner | None = None,
+    clock: Callable[[], datetime] | None = None,
+) -> FastAPI:
     settings = settings if settings is not None else Settings.from_sources(os.environ, None)
     service = SessionService(
-        SessionStore(settings.data_dir / "sessions", boundary=settings.data_dir), agent,
+        SessionStore(settings.data_dir / "sessions", boundary=settings.data_dir),
+        agent,
+        catalog=CompetitionCatalog(settings.catalog_path),
+        clock=clock,
     )
     application = FastAPI(debug=False)
     application.state.settings = settings
@@ -118,6 +138,10 @@ def create_app(settings: Settings | None = None, agent: AgentRunner | None = Non
     @application.patch("/api/sessions/{session_id}/profile", response_model=SessionSnapshot)
     async def patch_profile(session_id: str, body: ProfilePatchRequest) -> SessionSnapshot:
         return await service.patch_profile(session_id, body)
+
+    @application.get("/api/competitions/{instance_id}", response_model=CompetitionDetail)
+    async def get_competition(instance_id: str) -> CompetitionDetail:
+        return service.get_competition(instance_id)
 
     return application
 
