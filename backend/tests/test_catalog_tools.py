@@ -199,6 +199,32 @@ def test_tasks_may_continue_after_registration_before_competition(tmp_path):
     assert result.conflicts == []
 
 
+@pytest.mark.parametrize(
+    "task",
+    [
+        {"start_date": "2026-10-05", "due_date": "2026-10-11"},
+        {"start_date": "2026-10-17", "due_date": "2026-10-20"},
+        {"start_date": "2026-10-17", "due_date": None},
+    ],
+)
+def test_final_i2_past_start_is_conflict_without_allocating_elapsed_capacity(tmp_path, task):
+    catalog = catalog_at(tmp_path)
+    profile = Profile(grade="大二", major="计算机", weekly_hours=6)
+    plan = draft(task)
+    # UTC Oct 17 is Beijing Oct 18: injected clock owns the lower bound.
+    now = datetime.fromisoformat("2026-10-17T16:30:00+00:00")
+    result = evaluate_plan(profile, plan, catalog, now)
+    assert result.feasibility == "infeasible"
+    assert result.weekly_load == []
+    assert any("重排" in reason and "2026-10-18" in reason for reason in result.conflicts)
+    tool = ToolRegistry(catalog, clock=lambda: now).execute(
+        "evaluate_plan",
+        {"plan": plan.model_dump(mode="json")},
+        SessionSnapshot(session_id="s", stage="R4", profile=profile),
+    )
+    assert tool.data == result.model_dump(mode="json")
+
+
 def test_no_available_day_and_late_tasks_are_conflicts(tmp_path):
     plan = draft({})
     plan.tasks[0].due_date = date(2026, 10, 19)

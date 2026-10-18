@@ -4,7 +4,10 @@ import asyncio
 import copy
 import json
 import socket
+import sys
+from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -38,6 +41,7 @@ def offline_private_boundary(monkeypatch):
         pytest.fail("Offline HTTP tests must not connect to network services")
 
     monkeypatch.setattr(socket.socket, "connect", forbidden)
+    monkeypatch.setattr(socket.socket, "connect_ex", forbidden)
     monkeypatch.setattr(socket, "create_connection", forbidden)
     original = Path.open
 
@@ -1021,3 +1025,243 @@ async def test_failed_chat_can_retry_same_id_without_partial_cache(settings):
         assert success.json()["revision"] == 1
         assert len(success.json()["messages"]) == 2
         assert agent.calls == 2
+
+
+def local_provider_app(settings, monkeypatch, script, clock_source=clock):
+    """Keep the default factory/Agent; replace only the external provider module."""
+    steps = iter(copy.deepcopy(script))
+    calls = []
+
+    async def completion(**kwargs):
+        calls.append(copy.deepcopy(kwargs))
+        step = next(steps)
+        is_tool = "tool_calls" in step
+        return {
+            "choices": [
+                {
+                    "finish_reason": "tool_calls" if is_tool else "stop",
+                    "message": {
+                        "role": "assistant",
+                        "content": None if is_tool else json.dumps(step, ensure_ascii=False),
+                        **(step if is_tool else {}),
+                    },
+                }
+            ]
+        }
+
+    monkeypatch.setitem(sys.modules, "litellm", SimpleNamespace(acompletion=completion))
+    app = create_app(
+        settings.model_copy(
+            update={"deepseek_api_key": Settings(deepseek_api_key="fake").deepseek_api_key}
+        ),
+        clock=clock_source,
+    )
+    assert isinstance(app.state.service.agent, LiteLLMAgent)
+    assert app.state.service.agent.completion is None
+    return app, calls
+
+
+@pytest.mark.parametrize("runner", ["default_provider", "untrusted_runner"])
+@pytest.mark.parametrize(
+    "field,wrong,negative,correct,affirmative,label",
+    [
+        (
+            "weekly_hours",
+            20,
+            "我每周不能投入20小时，实际每周只有6小时。",
+            8,
+            "每周能投入8小时",
+            "每周投入",
+        ),
+        (
+            "major",
+            "金融",
+            "不要把专业改成金融，我的专业仍是计算机。",
+            "金融",
+            "请更正专业为金融",
+            "专业",
+        ),
+        ("grade", "大三", "我不是大三，我是大二。", "大三", "我是大三", "年级"),
+    ],
+)
+async def test_final_i1_negated_scalar_preserves_confirmed_results_then_correction_resolves(
+    settings, monkeypatch, runner, field, wrong, negative, correct, affirmative, label
+):
+    bad = {"kind": "profile", "message": "错误提取", "profile_changes": {field: wrong}}
+    good = {"kind": "profile", "message": "请核对更正。", "profile_changes": {field: correct}}
+    script = drafts() + [bad, good, good]
+    if runner == "default_provider":
+        # R1 must really discover IDs via a local tool, not bypass its exposure ledger.
+        script.insert(
+            1,
+            {
+                "tool_calls": [
+                    {
+                        "id": "search",
+                        "type": "function",
+                        "function": {
+                            "name": "search_competitions",
+                            "arguments": "{}",
+                        },
+                    }
+                ]
+            },
+        )
+        app, _ = local_provider_app(settings, monkeypatch, script)
+    else:
+        app = create_app(settings, ScriptedAgent(script), clock)
+    store = app.state.service.store
+    async with client_for(app) as client:
+        state = await reach_stage(client)
+        saved = store.load(state["session_id"])
+        assert saved.confirmed_profile is not None
+        assert state["cards"] and state["plan"]["feasibility"] == "feasible"
+        reviewed, _ = await chat(client, state, content=negative)
+        for key in ("stage", "status", "needs_confirmation", "profile", "cards", "plan"):
+            assert reviewed[key] == state[key]
+        assert label in reviewed["message"] and "核对" in reviewed["message"]
+        after = store.load(state["session_id"])
+        assert after.confirmed_profile == saved.confirmed_profile
+        assert after.coarse_cards == saved.coarse_cards
+        reviewed = await confirm(client, reviewed)
+        assert reviewed["status"] == "completed"  # The preserved valid plan is still confirmable.
+        edited, _ = await chat(client, reviewed, content=affirmative)
+        assert edited["profile"][field] == correct
+        assert (edited["stage"], edited["status"]) == ("R0", "collecting")
+        assert edited["cards"] == [] and edited["plan"] is None
+        assert store.load(state["session_id"]).confirmed_profile is None
+        # A following R0 review/confirm still works; no permanent review loop.
+        reviewed, _ = await chat(client, edited)
+        assert (await confirm(client, reviewed))["stage"] == "R1"
+
+
+@pytest.mark.parametrize("field,value", [("grade", "大三"), ("major", "金融"), ("weekly_hours", 8)])
+async def test_final_i1_direct_patch_remains_authoritative(settings, field, value):
+    async with client_for(create_app(settings, ScriptedAgent(), clock)) as client:
+        state = await reach_stage(client)
+        response = await client.patch(
+            f"/api/sessions/{state['session_id']}/profile",
+            json={"expected_revision": state["revision"], "changes": {field: value}},
+        )
+        assert response.status_code == 200
+        assert response.json()["profile"][field] == value
+        assert response.json()["stage"] == "R0"
+
+
+@pytest.mark.parametrize("start,end", [("2026-10-05", "2026-10-11"), ("2026-10-17", "2026-10-20")])
+async def test_final_i2_default_provider_past_or_cross_today_plan_cannot_confirm(
+    settings, monkeypatch, start, end
+):
+    script = drafts()
+    script[3]["plan"]["tasks"][0].update(start_date=start, due_date=end)
+    plan = copy.deepcopy(script[3]["plan"])
+    script.insert(
+        1,
+        {
+            "tool_calls": [
+                {
+                    "id": "search",
+                    "type": "function",
+                    "function": {
+                        "name": "search_competitions",
+                        "arguments": "{}",
+                    },
+                }
+            ]
+        },
+    )
+    script.insert(
+        4,
+        {
+            "tool_calls": [
+                {
+                    "id": "evaluate",
+                    "type": "function",
+                    "function": {
+                        "name": "evaluate_plan",
+                        "arguments": json.dumps({"plan": plan}),
+                    },
+                }
+            ]
+        },
+    )
+    app, calls = local_provider_app(settings, monkeypatch, script)
+    async with client_for(app) as client:
+        state = await reach_stage(client)
+        assert state["plan"]["feasibility"] == "infeasible"
+        assert state["plan"]["weekly_load"] == []
+        assert any(
+            "重排" in reason and "2026-10-18" in reason for reason in state["plan"]["conflicts"]
+        )
+        tool = json.loads(calls[-1]["messages"][-1]["content"])
+        assert tool["data"] == state["plan"]
+        response = await client.post(
+            f"/api/sessions/{state['session_id']}/confirm",
+            json={"expected_revision": state["revision"], "stage": "R4"},
+        )
+        assert response.status_code == 422
+        assert (await client.get(f"/api/sessions/{state['session_id']}")).json() == state
+
+
+@pytest.mark.parametrize("delayed", [False, True])
+async def test_final_i2_injected_beijing_clock_today_future_and_delayed_confirm(
+    settings, monkeypatch, delayed
+):
+    # UTC still Oct 17, but Beijing already Oct 18. Never consult system today.
+    current = [datetime.fromisoformat("2026-10-17T16:30:00+00:00")]
+    script = drafts()
+    task = script[3]["plan"]["tasks"][0]
+    task.update(start_date="2026-10-18", due_date="2026-10-18", estimated_hours=2)
+    future = {**task, "id": "future", "start_date": "2026-10-19", "due_date": "2026-10-20"}
+    script[3]["plan"]["tasks"].append(future)
+    script.insert(
+        1,
+        {
+            "tool_calls": [
+                {
+                    "id": "search",
+                    "type": "function",
+                    "function": {
+                        "name": "search_competitions",
+                        "arguments": "{}",
+                    },
+                }
+            ]
+        },
+    )
+    app, calls = local_provider_app(settings, monkeypatch, script, lambda: current[0])
+    async with client_for(app) as client:
+        state = await reach_stage(client)
+        assert state["plan"]["feasibility"] == "feasible"
+        if delayed:
+            current[0] = datetime.fromisoformat("2026-10-20T04:00:00+00:00")
+            assert (await client.get("/api/competitions/fictional_open")).json()[
+                "registration_status"
+            ] == "open"
+            before = len(calls)
+            response = await client.post(
+                f"/api/sessions/{state['session_id']}/confirm",
+                json={"expected_revision": state["revision"], "stage": "R4"},
+            )
+            assert response.status_code == 422
+            assert len(calls) == before
+            assert (await client.get(f"/api/sessions/{state['session_id']}")).json() == state
+        else:
+            assert (await confirm(client, state))["status"] == "completed"
+
+
+async def test_final_i2_default_agent_prompt_uses_injected_beijing_date(settings, monkeypatch):
+    # Deliberately unrelated to wall-clock today; R0 needs no catalog date fixture.
+    now = datetime.fromisoformat("2031-02-04T16:30:00+00:00")
+    app, calls = local_provider_app(
+        settings,
+        monkeypatch,
+        [{"kind": "question", "message": "请核对。"}],
+        lambda: now,
+    )
+    async with client_for(app) as client:
+        state = (await client.post("/api/sessions", json={})).json()
+        await chat(client, state, content="请规划。")
+    context = json.loads(calls[0]["messages"][1]["content"].split("\n", 1)[1])
+    assert context["current_date"] == "2031-02-05"
+    assert context["timezone"] == "Asia/Shanghai"

@@ -1026,6 +1026,64 @@ async def test_review_i2_ambiguous_change_names_field_and_confirmation_resolves_
     assert confirmed.kind == "profile" and confirmed.profile_changes.weekly_hours == 2
 
 
+@pytest.mark.parametrize(
+    "field,value,text",
+    [
+        ("weekly_hours", 8, "每周6小时，每周8小时。"),
+        ("grade", "大三", "我是大二，我是大三。"),
+        ("major", "金融", "我的专业是计算机，我的专业是金融。"),
+        ("grade", "大三", "我可能是大三。"),
+        ("major", "金融", "专业也许是金融。"),
+        ("weekly_hours", 8, "每周可能8小时。"),
+        ("grade", "大三", "不是大三，我是大三。"),
+        ("major", "金融", "不要改成金融，请更正专业为金融。"),
+        ("weekly_hours", 8, "每周不能投入8小时，每周能投入8小时。"),
+        ("grade", "大三", "朋友是大三。"),
+        ("major", "金融", "我想参加金融竞赛。"),
+        ("weekly_hours", 6, "每周6小时，每周也能8小时。"),
+        ("grade", "大三", "我是大三，我目前大二。"),
+        ("major", "金融", "我的专业是金融，我专业计算机。"),
+        ("weekly_hours", 8, "每周8小时，也许每周6小时。"),
+        ("grade", "大三", "我是大三，也许我是大二。"),
+        ("major", "金融", "我的专业是金融，也许专业是计算机。"),
+    ],
+)
+async def test_final_i1_conflicting_uncertain_or_unattributed_scalar_gets_review(
+    registry, field, value, text
+):
+    script = Script(
+        response(
+            {
+                "kind": "profile",
+                "message": "错误提取",
+                "profile_changes": {field: value},
+            }
+        )
+    )
+    draft = await LiteLLMAgent(Settings(), registry, script).run(snapshot(), request(text))
+    assert draft.kind == "question" and draft.profile_changes is None
+    assert "核对" in draft.message
+
+
+async def test_final_i1_affirmative_scalar_and_not_teaming_are_independent(registry):
+    script = Script(
+        response(
+            {
+                "kind": "profile",
+                "message": "请核对。",
+                "profile_changes": {"grade": "大三", "team_preference": "solo"},
+            }
+        )
+    )
+    draft = await LiteLLMAgent(Settings(), registry, script).run(
+        snapshot(),
+        request("我是大三，我不组队。"),
+    )
+    assert draft.kind == "profile"
+    assert draft.profile_changes.grade == "大三"
+    assert draft.profile_changes.team_preference == "solo"
+
+
 @pytest.mark.parametrize("existing", [[], [{"name": "Python", "evidence": "课程项目"}]])
 async def test_review_i3_name_alone_cannot_authorize_invented_evidence(registry, existing):
     state = snapshot(profile=Profile(skills=existing))

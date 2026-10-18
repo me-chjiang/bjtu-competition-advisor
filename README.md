@@ -17,11 +17,11 @@ node scripts/smoke-test.mjs              # 期望输出 session ID 和 "title: E
 
 ## 本地 Python 后端
 
-> AI 辅助整理，2026-10-18。R0 → R1 → R2 → R4 的 HTTP 模拟闭环已通过离线测试，Task 1–5 已通过分任务独立审查，整体验收审查待完成；**没有验证真实 DeepSeek 调用、Python Lexmount SDK 或 MIS 端到端采集**。
+> AI 辅助整理，2026-10-18。R0 → R1 → R2 → R4 的 HTTP 模拟闭环已通过离线测试，Task 1–5 分任务审查及最终问题修复复审均通过；**没有验证真实 DeepSeek/provider 调用、Python Lexmount SDK 或 MIS 端到端采集**。
 
 单进程 FastAPI、一个 LiteLLM Agent、本地 JSON，无数据库、队列或模型 Proxy。现有 Node 采集工具保留；Python 后端尚未接入在线补全、MIS 登录、R3、流式输出或日历导出。
 
-从仓库根目录运行（Python ≥ 3.10；当前验证环境为 Python 3.14）：
+从仓库根目录运行（声明 Python ≥ 3.10；当前验证环境为 Python 3.14，最低版本 3.10 尚未实测）：
 
 ```bash
 python3 -m venv "$HOME/.venvs/bjtu-competition-advisor"
@@ -70,10 +70,11 @@ curl http://127.0.0.1:8000/api/competitions/fictional_2026_open
 ```
 
 - OpenAPI：`http://127.0.0.1:8000/openapi.json`；交互文档：`/docs`。画像、候选 PATCH、chat、confirm 的字段见[前后端契约](docs/frontend-contract.md)。确认只确认当前 revision，不调用模型；无预算可筛选，但不能最终确认未知可行性路线。日历返回 `501 FEATURE_NOT_ENABLED`。
+- 画像的年级/专业/工时修改只接受有限明确肯定/更正语法；否定、冲突或无法解析时核对具体字段，保留已确认画像及有效结果，明确更正或 PATCH 可继续。技能与中文组队规则独立，“不组队”仍有效。路线任务不得早于后端 clock 的北京时间今天：过去或跨今天任务明确不可行并要求重排，不分配该任务周负载、不假设已完成；工具/生成/延迟确认共用规则。
 - 缺竞赛文件：`503 CATALOG_NOT_CONFIGURED`；损坏目录：`503 CATALOG_INVALID`；损坏会话/写盘失败：`500 INTERNAL_ERROR`，不覆盖损坏文件。配置无效在 factory/显式读取时以 `CONFIG_INVALID` 拒绝启动，不伪装为缺目录。
 - 仅运行一个 worker。真实资料和会话放忽略的 `data/`，限制访问并备份。存储拒绝已存在的会话目录/文件符号链接，但**不是针对恶意本地进程并发换链的文件系统沙箱**；受信任的 data 边界及上级目录应由部署者保护。
 - 默认仅本机访问；开放网络前必须实现鉴权和会话归属校验。CORS 不等于鉴权；预检协议拒绝可能是纯文本，不保证业务 JSON 错误包。
-- 测试使用 tmp_path 虚构目录和注入 Agent，不读取真实配置或私有资料，也不请求模型/云；默认 app 仍连接真实、provider 懒加载的 LiteLLMAgent。详细预算、证据规则和限制见 [LLM 对接](docs/llm-integration.md)。
+- 测试使用 tmp_path 虚构目录、注入 Agent 及默认 factory LiteLLMAgent + 进程内本地 provider 桩，保留真实工具/service/store；阻断网络，不读取真实配置或私有资料，也不请求模型/云。默认 app 仍使用 provider 懒加载的 LiteLLMAgent；离线桩不证明真实 provider 兼容。详细预算、证据规则和限制见 [LLM 对接](docs/llm-integration.md)。
 
 ## 文档地图
 

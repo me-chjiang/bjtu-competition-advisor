@@ -1,6 +1,6 @@
 # 前后端契约约定
 
-> AI 辅助整理（OpenCode），2026-10-15；2026-10-18 同步已实现的轻量 Python 后端。HTTP 离线模拟闭环已验证，Task 5 待独立审查；真实 LLM/SDK/MIS 集成未验收。与 `plan.md` 的历史接口摘要冲突时，以本文和 `/openapi.json` 为准。
+> AI 辅助整理（OpenCode），2026-10-15；2026-10-18 同步已实现的轻量 Python 后端。Task 1–5 分任务独立审查及最终问题修复复审均通过；真实 LLM/SDK/MIS 集成未验收。与 `plan.md` 的历史接口摘要冲突时，以本文和 `/openapi.json` 为准。
 
 ## 1. 通用约定
 
@@ -75,6 +75,8 @@
 `additional_context` 为可选补充文本，类型 `string | null`、默认 `null`、最多 2000 字符，空白文本归一化为 `null`。用于补充经历、偏好和特殊限制，不是任意 JSON 扩展字段。整个文本随 PATCH 替换，`null` 清空。后端可以提出结构化信息修改建议，但不得把补充文本当系统指令或擅自解决与已确认字段的冲突；界面提醒勿填写账号密码等敏感信息。
 
 `changes` 只允许上述字段，未提供的字段保持原值，数组整体替换；`null` 只用于允许为空的字段。模型提取的信息也是草案，不能把猜测当作用户确认。
+
+聊天修改年级、专业、每周投入仅接受有限的明确肯定/更正语法，例如“我是大三”“请更正专业为金融”“每周能投入8小时”。候选值被否定、存在多个冲突值或字段表达无法明确解析时，返回具体字段核对问题，保留原画像、已确认画像及当前有效结果；不会因一句否定而清空旧分析。随后明确更正或直接 PATCH 均可解除核对，不要求新增确认字段。此边界不是通用自然语言理解；技能经历/删除和中文组队偏好使用各自规则，“不组队”仍可表达个人参赛。
 
 ## 3. 聊天、修改和阶段确认
 
@@ -163,6 +165,7 @@
 - `GET /competitions/{id}` 返回 `competition_instance_id`、`name`、`series_id`、`year`、`group`、`stage`、`eligibility_description`、`registration_status`、`registration_start`、`registration_deadline`、`competition_date`、`evidence`；未知字段为 `null`，其中竞赛 `stage` 是比赛阶段文本，不是会话的 R0/R1。证据只返回该用户可访问的内容，不附带云浏览器接管链接。
 - `plan` 在 R4 为对象，字段为 `selected_competition_ids`、`tasks`、`weekly_load`、`conflicts`、`assumptions`、`feasibility`。`feasibility` 为 `feasible | infeasible | unknown`；后两种必须明确提示原因，不能当作可执行方案确认。
 - 每个任务包含 `id`、`competition_instance_id`、`title`、`estimated_hours`、`acceptance_criteria`、`start_date`、`due_date`；每周负载包含 `week_start`、`estimated_hours`、`budget_hours`。投入以小时计，任务投入已知时须大于 0，`week_start` 固定为周一日期；`conflicts` 与 `assumptions` 均为说明字符串数组。未知投入或日期为 `null`，不以 0 代替。
+- 任务下界为后端时钟在 `Asia/Shanghai` 的当前日期：任何 `start_date` 早于今天（含全部过去、跨今天，或到期日未知）均产生要求重排的明确冲突，`feasibility=infeasible`；该任务整体不分配 `weekly_load`，不静默截取未来部分、扣除工时或猜测过去已完成。当前无完成度/剩余工时模型。工具、草案保存和 confirm 共用规则；延迟确认时，即使报名仍开放，只要任务起点已过也拒绝完成。今天及未来起点不因此被拒绝；周一标签早于今天不代表分配了过去日期的容量。
 - 前端把模型文案作为文本或经过清洗的 Markdown 渲染，禁用原始 HTML；来源链接仅允许 HTTP(S)。日期、资格、提示色和按钮状态从结构化字段读取。
 
 ## 5. 并发、错误和重试
@@ -210,4 +213,4 @@ chat 使用前端生成的唯一 `request_id`：相同 ID、相同请求体在�
 
 先用本文虚构数据做前端 mock：创建会话、问答、生成、确认、修改、恢复候选、刷新恢复和错误提示。重点验证旧版本确认被拒绝、双击不重复调用、未知不显示为符合、画像修改清除旧结果，以及来源文案不执行 HTML。
 
-FastAPI `/openapi.json` 为字段契约；`backend/tests/test_api_flow.py` 使用 tmp_path 虚构目录、ScriptedAgent 和真实 service/store/rules 覆盖完整流程、版本、重放、失败原子性及越权草案，非真实模型验收。模型返回值不能直接成为 HTTP 响应。无需为此新增契约平台或独立服务。
+FastAPI `/openapi.json` 为字段契约；`backend/tests/test_api_flow.py` 使用 tmp_path 虚构目录、ScriptedAgent 及默认 factory LiteLLMAgent + 进程内本地 provider 桩，保留真实工具/service/store/rules，覆盖完整流程、版本、重放、失败原子性、否定画像、过期路线及越权草案；网络连接被阻断，非真实模型验收。模型返回值不能直接成为 HTTP 响应。无需为此新增契约平台或独立服务。

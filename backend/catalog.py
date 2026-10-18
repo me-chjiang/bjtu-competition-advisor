@@ -261,7 +261,7 @@ def evaluate_plan(
     time check: supported registration/race dates, task estimates, and budget.
     Known conflicts dominate unknowns; neither can produce a feasible result.
     """
-    _aware(now)
+    today = _aware(now).astimezone(BEIJING).date()
     selected = plan.selected_competition_ids
     if len(set(selected)) != len(selected) or len({t.id for t in plan.tasks}) != len(plan.tasks):
         raise AppError("VALIDATION_ERROR", "方案包含重复的竞赛或任务 ID。", 422)
@@ -289,6 +289,13 @@ def evaluate_plan(
     unavailable = set(profile.unavailable_dates)
     for task in plan.tasks:
         start, end = task.start_date, task.due_date
+        if start is not None and start < today:
+            # No completion/remaining-hours model exists. Never count elapsed
+            # days as capacity or assume their assigned work has been completed.
+            conflicts.append(
+                f"{task.id}：任务开始早于今天 {today.isoformat()}（Asia/Shanghai），请重排。"
+            )
+            continue
         race_date = assessed[task.competition_instance_id].competition_date
         if race_date is not None and end is not None and end > race_date:
             conflicts.append(f"{task.id}：任务结束晚于明确比赛日。")

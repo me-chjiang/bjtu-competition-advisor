@@ -16,7 +16,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from backend.catalog import _applicable, assess_competition, check_eligibility
+from backend.catalog import BEIJING, _applicable, _aware, assess_competition, check_eligibility
 from backend.config import Settings
 from backend.schemas import AgentDraft, AppError, ChatRequest, CompetitionDetail, SessionSnapshot
 from backend.tools import ToolRegistry, ToolResult
@@ -32,6 +32,7 @@ _SYSTEM = """你是北交大竞赛能力匹配助手，只生成草案，不保�
 本届明确事实 explicit 必须有同年、同组别、同比赛阶段且已获取的肯定适用证据。
 往届/范围未知资料只可作带 uncertainties 的 inferred 背景，绝不升级为本届事实。
 日期和资格只信后端规则结论，不把 partial/unknown 当成符合。不要虚构获奖概率或加分。
+任务开始日期不得早于后端 current_date（Asia/Shanghai）；过去或跨今天的任务须重排，不能假设已完成。
 普通回答使用 question（其他载荷为空）；画像建议使用 profile（只有 profile_changes）；
 阶段结果 candidates/analysis/plan 只包含对应非空载荷。任何阶段可提问或建议画像修改。
 不要输出 session_id、revision、确认、权限、状态、可行性、周负载或其他后端字段。
@@ -229,6 +230,8 @@ class _Context:
                 )
         context = {
             "stage": snapshot.stage,
+            "current_date": _aware(self.now).astimezone(BEIJING).date().isoformat(),
+            "timezone": "Asia/Shanghai",
             "profile": snapshot.profile.model_dump(mode="json"),
             "backend_decisions": related,
             "current_plan": snapshot.plan.model_dump(mode="json") if snapshot.plan else None,
@@ -749,6 +752,113 @@ class LiteLLMAgent:
         return False
 
     @staticmethod
+    def _scalar_supported(key: str, value: Any, content: str) -> bool:
+        """Finite affirmative attribution/correction grammar, not substring proof.
+
+        Collect all recognized values, not just the proposed one. A denial or
+        uncertainty mentioning that value vetoes it even beside an affirmation.
+        Other fields (notably “不组队” and skill deletion) keep their own grammar.
+        """
+        clauses = [clause.strip() for clause in re.split(r"[，,。！？\n；;]", content)]
+        uncertain = r"可能|也许|或许|不确定|待定|左右"
+        unresolved = r"不|没|未|无|非|别|勿|" + uncertain
+        chinese = {
+            "一": 1,
+            "二": 2,
+            "两": 2,
+            "三": 3,
+            "四": 4,
+            "五": 5,
+            "六": 6,
+            "七": 7,
+            "八": 8,
+            "九": 9,
+            "十": 10,
+        }
+        number = r"(?:\d+(?:\.\d+)?|[一二两三四五六七八九十])"
+        hours = r"\s*(?:个)?(?:小时|h(?:ours?)?)"
+        week = r"(?:每周|一周|每星期|每礼拜)"
+        label = {"grade": "年级", "major": "专业", "weekly_hours": "每周投入"}[key]
+        patterns = [
+            r"(?:我的)?" + label + r"\s*(?:仍是|是|为|[:：])\s*(?P<value>.+)",
+            r"(?:请)?(?:将|把)?" + label + r"(?:更正|修改|改)(?:为|成)\s*(?P<value>.+)",
+            r"(?:请)?更正" + label + r"为\s*(?P<value>.+)",
+        ]
+        if key == "weekly_hours":
+            patterns = [
+                r"(?:我(?:确认)?(?:是)?|实际)?"
+                + week
+                + r"(?:投入|时间预算|可投入时间)?(?:是|为|[:：])?"
+                + r"(?:能投入|可以投入|可投入|只能投入|只有|能|有)?\s*(?P<value>"
+                + number
+                + r")"
+                + hours,
+                r"(?:请)?(?:将|把)?"
+                + week
+                + r"投入(?:从"
+                + number
+                + hours
+                + r")?"
+                + r"(?:更正|修改|改)(?:为|成)(?P<value>"
+                + number
+                + r")"
+                + hours,
+                r"(?:请)?更正" + week + r"投入为(?P<value>" + number + r")" + hours,
+            ]
+        choices = set()
+        field_hint = {
+            "grade": r"年级|大[一二三四五六]|研[一二三]",
+            "major": r"专业",
+            "weekly_hours": week,
+        }[key]
+        for clause in clauses:
+            if key == "weekly_hours":
+                mentioned = any(
+                    (chinese[token] if token in chinese else float(token)) == value
+                    for token in re.findall(
+                        r"(?<![\d.])(" + number + r")(?=" + hours + r")", clause
+                    )
+                )
+                remainder = clause
+            else:
+                mentioned = value in clause
+                remainder = clause.replace(value, "")
+            if re.search(uncertain, remainder) and (mentioned or re.search(field_hint, clause)):
+                return False  # A tentative different value is not resolved by an affirmation.
+            if re.search(unresolved, remainder):
+                if mentioned:
+                    return False
+                continue
+            # Retain the compact introductory form “我是大二计算机专业”.
+            identity = re.fullmatch(
+                r"我(?:确认)?(?:现在)?是(?P<grade>大[一二三四五六]|研[一二三])"
+                r"(?:(?P<major>.+?)专业)?",
+                clause,
+            )
+            if identity and key in {"grade", "major"}:
+                if identity[key]:
+                    choices.add(identity[key])
+                continue
+            if key == "major":
+                major = re.fullmatch(r"我(?:确认)?(?:现在)?(?:是|读)(.+?)专业", clause)
+                if major:
+                    choices.add(major[1])
+                    continue
+            for pattern in patterns:
+                matched = re.fullmatch(pattern, clause)
+                if matched:
+                    found = matched["value"].strip()
+                    if key == "weekly_hours":
+                        choices.add(chinese[found] if found in chinese else float(found))
+                    else:
+                        choices.add(found)
+                    break
+            else:
+                if re.search(field_hint, clause):
+                    return False  # Unparsed field wording may contain another value.
+        return choices == {value}
+
+    @staticmethod
     def _supported(key: str, value: Any, content: str | None) -> bool:
         """Conservative literal provenance, not semantic conflict resolution.
 
@@ -757,6 +867,8 @@ class LiteLLMAgent:
         """
         if content is None or value is None:
             return False
+        if key in {"grade", "major", "weekly_hours"}:
+            return LiteLLMAgent._scalar_supported(key, value, content)
         if key != "additional_context":
             content = "，".join(
                 clause
@@ -780,32 +892,6 @@ class LiteLLMAgent:
                 ) and not re.search(r"(?:不想|不希望|不愿|不要|不考虑|不)组队", clause):
                     choices.add("team")
             return choices == {value}
-        if key == "weekly_hours":
-            tokens = [re.escape(str(value))]
-            if float(value).is_integer():
-                tokens.append(re.escape(str(int(value))))
-            chinese = {
-                1: "一",
-                2: "[二两]",
-                3: "三",
-                4: "四",
-                5: "五",
-                6: "六",
-                7: "七",
-                8: "八",
-                9: "九",
-                10: "十",
-            }
-            if value in chinese:
-                tokens.append(chinese[value])
-            return bool(
-                re.search(
-                    r"(?:每周|一周|每星期|每礼拜)[^。！？\n]{0,20}?(?<![\d.])(?:"
-                    + "|".join(tokens)
-                    + r")\s*(?:个)?(?:小时|h(?:ours?)?\b)",
-                    content,
-                )
-            )
         if isinstance(value, str):
             return bool(value.strip()) and value in content
         if isinstance(value, list):
