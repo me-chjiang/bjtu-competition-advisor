@@ -1,21 +1,25 @@
 # LLM 对接约定（LiteLLM）
 
-> AI 辅助整理（OpenCode），2026-10-15。本文是拟定实现说明，示例尚未进行真实模型调用；不表示 Agent 已实现。沿用单进程、单 Agent、JSON 存储，不部署 LiteLLM Proxy。
+> AI 辅助整理（OpenCode），2026-10-15；2026-10-18 同步 LiteLLMAgent 和 HTTP 事务实现。Task 1–5 分任务独立审查及最终问题修复复审均通过；真实 DeepSeek/provider、Python Lexmount SDK/MIS 联网验收未完成。单进程、单 Agent、JSON 存储，不部署 LiteLLM Proxy。
 
 ## 1. 职责和配置
 
-`agent.py` 集中调用 LiteLLM；`tools.py` 提供受控工具；`schemas.py` 校验草案；`main.py` 把校验后的业务结果转换为[前端契约](frontend-contract.md)。前端不直接连接模型，不选择任意 provider、API base URL 或工具，不发送完整历史让后端照单转发。
+`agent.py` 集中调用 LiteLLM；`tools.py` 提供受控工具；`schemas.py` 校验草案；`service.py` 在会话 guard 内独立校验任何注入 Runner 的输出，完成失效/确认及单次原子提交；`main.py` 暴露[前端契约](frontend-contract.md)。前端不直接连接模型，不选择任意 provider、API base URL 或工具，不发送完整历史让后端照单转发。
 
 | 配置项 | 来源与默认建议 |
 |---|---|
 | `DEEPSEEK_API_KEY` | LiteLLM 官方 DeepSeek provider 读取的环境变量，必需；安全注入，不写进前端 |
-| `LLM_MODEL` | **本项目拟新增**，默认 `deepseek/deepseek-chat`，带 `deepseek/` provider 前缀 |
-| `LLM_TIMEOUT_SECONDS` | **本项目拟新增**，每次模型请求建议 30 秒 |
-| `LLM_MAX_OUTPUT_TOKENS` | **本项目拟新增**，单次输出上限建议 4096，按模型支持情况校验 |
+| `LLM_MODEL` | 默认 `deepseek/deepseek-chat`，带 `deepseek/` provider 前缀 |
+| `LLM_TIMEOUT_SECONDS` | 默认 30 秒；实际单次不超过 30 秒及整请求剩余时间 |
+| `LLM_MAX_OUTPUT_TOKENS` | 默认/上限 4096，真实 provider 参数支持仍待验证 |
 
-这些项目变量尚无读取代码。当前 `lexmount-config.yaml` 不会因此自动包含模型配置；Python 若读取该 YAML 需显式适配。无需新增 `.env`：现有忽略规则不包含它，真实密钥不得写入仓库。Lexmount 变量与模型 key 分开。
+这些变量由 `Settings.from_sources(environ, config_path)` 读取；默认 app 传 `config_path=None`，**只读环境和默认值，不自动读取 YAML 或 `.env`**。显式传入私有 YAML 才读取模板中的 `deepseek-api-key`、`llm-model` 等对应键，环境优先（包括空值）。完整配置/启动命令见 [README](../README.md#配置与启动)。无需新增 `.env`，真实密钥不得写入仓库。Lexmount 变量与模型 key 分开。
 
-首次接入确认所选模型的工具调用和 JSON 输出能力，再锁定测试通过的 LiteLLM 版本；不能因为接口兼容 OpenAI 就假设支持全部参数。LiteLLM 提供 `supports_function_calling`、`get_supported_openai_params` 和 `supports_response_schema` 作初步检查，仍需小样实测；不静默丢弃关键参数。
+默认 factory 组装真实 `LiteLLMAgent(settings, ToolRegistry(catalog, clock=clock))`，provider 在首次调用时才加载。缺 key 仅 chat 返回 `503 LLM_NOT_CONFIGURED`，不静默换 fake；创建/读取/编辑会话和确认不要求模型 key。竞赛目录懒加载，缺文件 `503 CATALOG_NOT_CONFIGURED`、无效文件 `503 CATALOG_INVALID`；R0 访谈不依赖目录。配置无效在读取/factory 时以 `CONFIG_INVALID` 拒绝启动。导入不读真实资料或 mkdir。
+
+目录文件是 JSON 数组，内部条目使用 `CompetitionRecord`（HTTP 的 CompetitionDetail 加 `allowed_grades`、`allowed_majors` 和 `eligibility_evidence_ids`、`registration_evidence_ids`、`competition_date_evidence_ids`）。三个引用数组只能指向本实例 evidence；没有可用日期依据时返回未知，不采信文件写入的 registration_status。`backend/examples/competitions.json` 给出完整文件形状和严格 scope 示例，全部是 AI 辅助生成的虚构数据，非 MIS 采集成果；已有 Node 的原始 JSONL 不能不经整理、来源检查就作为该目录。真实资料应放忽略的 `data/`，显式配置路径，不将公开 demo 的 example.com 链接冒充真实来源。
+
+当前锁定 LiteLLM 1.106.0；离线测试包含该 SDK 的响应/异常类型及本地 mock_response 日志隐私回归，不是所选模型的联网兼容性证明。首次联网仍须确认工具调用和 JSON 输出能力，不能因为接口兼容 OpenAI 就假设支持全部参数。LiteLLM 提供的能力查询仅可辅助检查，仍需小样实测；不静默丢弃关键参数。
 
 来源：[DeepSeek provider](https://docs.litellm.ai/docs/providers/deepseek)、[Function Calling](https://docs.litellm.ai/docs/completion/function_call)、[Structured Outputs](https://docs.litellm.ai/docs/completion/json_mode)。
 
@@ -33,6 +37,7 @@ from pydantic import BaseModel, Field
 
 class ProfileDraft(BaseModel):
     weekly_hours: float | None = Field(default=None, gt=0)
+    additional_context: str | None = Field(default=None, max_length=2000)
     follow_up_question: str = Field(min_length=1)
 
 
@@ -62,7 +67,9 @@ async def extract_profile(text: str) -> ProfileDraft:
 
 ## 3. 上下文和阶段输出
 
-每次请求由后端重新组装：系统规则 + 当前阶段要求 + 当前画像 + 用户明确决策 + 必要候选/证据 + 最近相关对话。不要把全部竞赛原文、网页或无限历史塞入上下文；裁剪时保留画像、约束、已选择/排除的项及引用 ID。
+每次请求由后端重新组装：系统规则 + 当前阶段要求 + 当前画像（包括可选 `additional_context`）+ 用户明确决策 + 必要候选/证据 + 最近相关对话。不要把全部竞赛原文、网页或无限历史塞入上下文；裁剪时保留画像、约束、已选择/排除的项及引用 ID。补充文本只作用户资料；与结构化字段冲突时提出核对问题，不静默覆盖。`weekly_hours=null` 不阻止访谈结束，不由模型补成默认每周投入。
+
+上下文的 `current_date` 为同一后端注入 clock 转换到 `Asia/Shanghai` 的日期，`timezone` 明确为 `Asia/Shanghai`；不是新增 DTO 字段或另一套系统 today。系统提示要求任务起点不早于该日期，避免生成已过期草案；提示不能代替后端时间规则。
 
 | 阶段 | 模型草案内容 | 后端决定的内容 |
 |---|---|---|
@@ -75,7 +82,7 @@ async def extract_profile(text: str) -> ProfileDraft:
 
 ## 4. 工具调用协议
 
-首版只开放计划中的领域工具，不开放终端、任意代码、SQL、报名操作或不受限 URL。`session_id`、画像和访问范围由服务端注入，不能相信模型传入的用户身份。
+首版只开放本地只读 `search_competitions`、`get_competition`、`get_evidence`、`check_eligibility`、`evaluate_plan`；R0 无工具，R1/R2 无 evaluate_plan，R4 可用全部五项。没有在线补全工具，不开放终端、任意代码、SQL、报名操作或不受限 URL。`session_id`、画像和访问范围由服务端注入，不能相信模型传入的用户身份。
 
 1. 根据阶段构造 `tools`（JSON Schema），设置 `tool_choice="auto"`。
 2. 模型返回 `tool_calls` 时，先把这条 assistant 消息连同工具调用 ID 加入模型上下文；有工具调用就先处理，不能把伴随 content 当最终结果提交。
@@ -87,27 +94,32 @@ async def extract_profile(text: str) -> ProfileDraft:
 
 ```json
 {
-  "status": "ok",
+  "status": "partial",
   "data": {
     "competition_instance_id": "ci_demo_2026_school",
     "registration_deadline": null
   },
   "evidence_ids": [],
-  "warnings": ["本届报名时间未知"]
+  "warnings": ["本届报名时间未知"],
+  "error": null
 }
 ```
 
-`status` 为 `ok | partial | error`；失败提供稳定错误码，不泄露底层异常、请求头、凭据或云会话接管 URL。无效参数也返回受控工具错误，不用 `eval` 修复参数；重复读取可缓存，同一请求内重复补全优先复用缓存，避免重复创建云会话。
+`status` 为 `ok | partial | error`，固定字段为 `status/data/evidence_ids/warnings/error`。成功/partial 必须有 data、error 为 null；partial 有非空 warnings；失败 data 为 null、evidence_ids 为空、error 提供稳定错误码，不泄露底层异常、请求头或凭据。无效参数也返回受控工具错误，不用 `eval` 修复参数。
 
-Lexmount SDK 与同步 Playwright 的完整会话生命周期放在同一个受控同步调用中，异步接口通过线程等方式隔离阻塞；不要跨线程复用 Playwright 对象。HTTP 超时或线程等待超时不等于取消云会话，仍须 SDK 超时和 `finally` 清理。
+现有工具通过线程隔离本地只读工作；等待超时不保证底层线程已终止，但它不能提交会话。未来如另行接入 Lexmount SDK/Playwright，须单独验证接口，在完整受控生命周期中隔离阻塞，设置 SDK 超时并 `finally` 关闭云会话；当前实现不能提供这些尚未接入的资源清理保证。
 
 工具调用消息格式来源：[LiteLLM Function Calling](https://docs.litellm.ai/docs/completion/function_call)。Lexmount 生命周期来源：[Python quickstart](https://browser.lexmount.cn/docs/python-sdk/quickstart)。
 
 ## 5. 校验、预算和失败处理
 
 - 先校验 JSON/Pydantic，再检查实例 ID、证据 ID、适用年度和组别、日期、资格及每周总投入。模型只能引用本次上下文或工具提供的证据 ID，URL 和摘录由后端按 ID 填入；不能把模型生成的 URL 当来源。
+- 事实载荷在格式修复前先过唯一 preflight：实例/引用容器必须健全，证据属于对应实例；明确事实必须同年、同 stage/group、已获取，scope 严格采用 [applies-to/v1 JSON](frontend-contract.md#4-推荐卡片证据和路线)。往届/范围不明证据只能作带 uncertainties 的 inferred 背景。服务再次用自己构造的允许范围执行同一校验，不相信注入 Runner 的“已校验”声明：R2 只能分析 keep 的项，R4 只能选择 keep 且已分析的项。
+- Agent 和 service 共享当前消息依据检查：年级/专业/工时收集有限肯定归属或更正语法中的值，不用单独子串命中证明授权。候选值的否定/不确定表述、多个冲突值、未解析的相关字段表述均先给具体字段核对问题，保留画像/confirmed_profile/有效结果。随后“请更正专业为金融”“我是大三”“每周能投入8小时”可继续聊天更正，直接 PATCH 仍有效；additional_context 不构成全局修改锁。不将否定词全局封禁：技能经历/删除、中文组队偏好保留独立规则，“不组队”可表达 solo。它不是通用 NLP 证明器，复杂表达需具体核对或直接 PATCH。
 - 提供依据不等于推断一定正确；不输出无依据的获奖概率、保研加分或“稳健推荐”。来源缺失正常返回未知，不要求模型补齐事实。
 - 模型草案与正式 HTTP 快照分开；只有整份输出通过校验且 revision 仍匹配，才原子保存到会话文件。失败保留上次有效结果。
+- guard 内先比对成功 request_id 的完整请求、再查 revision；成功消息/状态/缓存一次保存，失败/取消/写盘异常无半结果。重启可重放原快照，不调用模型；确认只接受当前阶段/version，且不调用模型。R4 的 `weekly_load/conflicts/feasibility` 来自 Python `evaluate_plan`，模型填写 server 字段被拒绝；confirm 按当前时钟重新评估，unknown/infeasible 不能完成。
+- `evaluate_plan` 以同一 clock 的北京时间今天为任务下界。任一任务 `start_date` 早于今天即明确 infeasible 并要求重排（包括全部过去、跨今天或未知到期日）；该任务不分配周负载，不假设已完成、扣减过去工时或只截取未来日期。无完成度/剩余工时模型；工具、生成及延迟 confirm 共用此规则，报名未截止也不能确认已过期任务。今天/未来路线仍按既有预算、日期和资格规则检查。
 - 建议每次 chat 总预算 120 秒、最多 5 次模型请求、最多 8 次工具执行；所有补充整理、格式修复和重试都计入预算，不能每一轮重新获得完整预算。
 - LiteLLM `num_retries=0`，重试由应用显式控制。限流或临时网络错误最多重试一次且遵守总预算；认证/余额/权限/不支持参数不自动重试。在线补全不因模型重试而重复执行。
 - JSON 解析或结构校验失败最多修复一次，只发送必要的字段错误；截断时先缩小候选和输出，不无限增加 token 上限。仍失败返回 `502 LLM_INVALID_OUTPUT`。
@@ -124,4 +136,4 @@ Lexmount SDK 与同步 Playwright 的完整会话生命周期放在同一个受�
 4. 超时、限流、无效 key、预算耗尽的受控错误及会话不被部分覆盖。
 5. 用户确认、画像更正后旧结果失效、重复 chat 请求不再次付费调用。
 
-这些是后续验收项，不是本次已通过的集成测试；无需为此引入多 Agent 框架、队列或独立模型网关。
+上述协议/状态/失败分支已有离线测试（注入 completion/ScriptedAgent、默认 factory LiteLLMAgent + 进程内本地 provider 桩、真实工具/规则/存储、SDK 本地 mock），测试阻断网络；不证明真实 provider 兼容。真实 provider 的工具/JSON 支持、费用、时延、输出质量和任何 Python 云 SDK 调用仍是后续联网验收项。没有自动执行付费调用；无需为此引入多 Agent 框架、队列或独立模型网关。Python 3.10 最低版本尚未实测。

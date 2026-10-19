@@ -12,3 +12,9 @@ data/
 .DS_Store
 # Claude Code 个人本地设置
 .claude/settings.local.json
+# Python development artifacts (real data remains under data/ above)
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/

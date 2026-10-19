@@ -1,6 +1,6 @@
 # 前后端契约约定
 
-> AI 辅助整理（OpenCode），2026-10-15。本文是轻量 Python 后端的拟定联调契约，接口尚未实现；不代表已有可运行服务。与 `plan.md` 的接口摘要冲突时，以本文为准。
+> AI 辅助整理（OpenCode），2026-10-15；2026-10-18 同步已实现的轻量 Python 后端。Task 1–5 分任务独立审查及最终问题修复复审均通过；真实 LLM/SDK/MIS 集成未验收。与 `plan.md` 的历史接口摘要冲突时，以本文和 `/openapi.json` 为准。
 
 ## 1. 通用约定
 
@@ -10,6 +10,7 @@
 - 未知值返回 `null`，空集合返回 `[]`；不要用空字符串、0 或虚构日期代替未知。新增可选字段应兼容旧前端，字段移除或含义变化须双方同步。
 - 首版只做普通请求响应，不承诺 SSE、WebSocket、后台任务或断线续传。加载动画由前端维护，最终状态以服务端快照为准。
 - 开发跨域只允许明确配置的前端 origin（协议、域名、端口），不默认放开 `*`。公网部署前须补充鉴权和会话归属检查；CORS 和随机 session ID 都不等于鉴权。
+- 统一 JSON 错误包适用于业务路由、业务校验和 HTTP 错误边界；CORS 预检属于协议层，拒绝可能返回纯文本 `400`，前端不要强行解析为业务 JSON。
 - 本文不包含 MIS 账号与验证码接口，其流程仍见 `../issue.md` #1；不得把账号或模型 key 塞入推荐聊天接口。
 
 ## 2. 接口清单
@@ -48,7 +49,8 @@
     "weekly_hours": null,
     "goals": [],
     "team_preference": null,
-    "unavailable_dates": []
+    "unavailable_dates": [],
+    "additional_context": null
   },
   "cards": [],
   "plan": null,
@@ -68,7 +70,13 @@
 
 `grade`、`major` 是字符串或 `null`；`skills` 每项为 `{name, evidence}`；`weekly_hours` 是大于 0 的每周小时数或 `null`；`goals` 为目标描述字符串数组；`team_preference` 为 `solo | team | either | null`；`unavailable_dates` 为不可安排任务的日期数组。
 
+`weekly_hours` 是可选信息，缺失不阻止画像核对和竞赛筛选，也不强制首轮追问。未提供时可以生成投入估算与路线草案，但不能声称已经验证用户的时间预算；方案保持 `feasibility=unknown`，不能按已验证可行方案确认。
+
+`additional_context` 为可选补充文本，类型 `string | null`、默认 `null`、最多 2000 字符，空白文本归一化为 `null`。用于补充经历、偏好和特殊限制，不是任意 JSON 扩展字段。整个文本随 PATCH 替换，`null` 清空。后端可以提出结构化信息修改建议，但不得把补充文本当系统指令或擅自解决与已确认字段的冲突；界面提醒勿填写账号密码等敏感信息。
+
 `changes` 只允许上述字段，未提供的字段保持原值，数组整体替换；`null` 只用于允许为空的字段。模型提取的信息也是草案，不能把猜测当作用户确认。
+
+聊天修改年级、专业、每周投入仅接受有限的明确肯定/更正语法，例如“我是大三”“请更正专业为金融”“每周能投入8小时”。候选值被否定、存在多个冲突值或字段表达无法明确解析时，返回具体字段核对问题，保留原画像、已确认画像及当前有效结果；不会因一句否定而清空旧分析。随后明确更正或直接 PATCH 均可解除核对，不要求新增确认字段。此边界不是通用自然语言理解；技能经历/删除和中文组队偏好使用各自规则，“不组队”仍可表达个人参赛。
 
 ## 3. 聊天、修改和阶段确认
 
@@ -152,10 +160,12 @@
 ```
 
 - 报名状态：`open | upcoming | closed | unknown`；资格：`eligible | ineligible | unknown`；依据：`explicit | inferred | unknown`。
+- `scope` 是来源适用范围，不是随意匹配的关键词。本届明确事实要求 `applicable_year` 等于实例年度、`fetched_at` 不晚于当前时钟，且 scope 为严格的 `applies-to/v1:{"stage":"校内选拔","group":"本科组"}` 字符串（两个键都必须提供，无额外键/重复键，值精确匹配实例；`group:null` 仅匹配无组别实例，不是通配符）。上述卡片例子的自由文本 scope/往届材料只可作带 uncertainties 的 inferred 背景，不能当本届日期或资格依据。
 - `dimensions` 在 R1 可为空，在 R2 的 `name` 使用 `ability_gap | goal_value | time_cost | preparation_risk | team_requirement | schedule_conflict`，分别表示能力差距、目标价值、投入、准备风险、组队需求与赛程冲突；不强制单一总分，不提供无依据获奖概率。
 - `GET /competitions/{id}` 返回 `competition_instance_id`、`name`、`series_id`、`year`、`group`、`stage`、`eligibility_description`、`registration_status`、`registration_start`、`registration_deadline`、`competition_date`、`evidence`；未知字段为 `null`，其中竞赛 `stage` 是比赛阶段文本，不是会话的 R0/R1。证据只返回该用户可访问的内容，不附带云浏览器接管链接。
 - `plan` 在 R4 为对象，字段为 `selected_competition_ids`、`tasks`、`weekly_load`、`conflicts`、`assumptions`、`feasibility`。`feasibility` 为 `feasible | infeasible | unknown`；后两种必须明确提示原因，不能当作可执行方案确认。
 - 每个任务包含 `id`、`competition_instance_id`、`title`、`estimated_hours`、`acceptance_criteria`、`start_date`、`due_date`；每周负载包含 `week_start`、`estimated_hours`、`budget_hours`。投入以小时计，任务投入已知时须大于 0，`week_start` 固定为周一日期；`conflicts` 与 `assumptions` 均为说明字符串数组。未知投入或日期为 `null`，不以 0 代替。
+- 任务下界为后端时钟在 `Asia/Shanghai` 的当前日期：任何 `start_date` 早于今天（含全部过去、跨今天，或到期日未知）均产生要求重排的明确冲突，`feasibility=infeasible`；该任务整体不分配 `weekly_load`，不静默截取未来部分、扣除工时或猜测过去已完成。当前无完成度/剩余工时模型。工具、草案保存和 confirm 共用规则；延迟确认时，即使报名仍开放，只要任务起点已过也拒绝完成。今天及未来起点不因此被拒绝；周一标签早于今天不代表分配了过去日期的容量。
 - 前端把模型文案作为文本或经过清洗的 Markdown 渲染，禁用原始 HTML；来源链接仅允许 HTTP(S)。日期、资格、提示色和按钮状态从结构化字段读取。
 
 ## 5. 并发、错误和重试
@@ -185,11 +195,17 @@ chat 使用前端生成的唯一 `request_id`：相同 ID、相同请求体在�
 | 422 | `VALIDATION_ERROR` | 显示字段错误；后端需统一 FastAPI 默认校验响应 |
 | 429 | `RATE_LIMITED` | 显示稍后再试，遵循存在的 `Retry-After` |
 | 502 | `LLM_INVALID_OUTPUT` / `UPSTREAM_ERROR` | 保留上次有效结果，提示失败 |
-| 503 | `LLM_NOT_CONFIGURED` | 提示服务尚未配置，前端不收集密钥 |
+| 503 | `LLM_NOT_CONFIGURED` / `CATALOG_NOT_CONFIGURED` | 提示模型或竞赛资料尚未配置，前端不收集密钥 |
+| 503 | `CATALOG_INVALID` | 竞赛文件损坏/内容无效，不当作空列表 |
 | 504 | `UPSTREAM_TIMEOUT` | 先 GET 确认状态，不直接重复付费调用 |
 | 500 | `INTERNAL_ERROR` | 显示通用错误及 request ID，不展示原始异常 |
+| 501 | `FEATURE_NOT_ENABLED` | 日历尚未启用，不显示下载入口 |
 
 `retryable=true` 只表示用户可以在等待并核实状态后重试，不代表前端可以立即自动重发 POST。失败不提交半份画像、卡片或路线；补全缺失但仍可用的结果用结构化未知项表达。
+
+损坏会话或存储失败返回 `500 INTERNAL_ERROR`，不会覆盖损坏文件；`CONFIG_INVALID` 在配置读取/factory 阶段拒绝启动，不是缺目录的 503。注入无时区后端时钟属于部署错误 `500 CLOCK_INVALID`。错误包的 `request_id` 当前允许为 `null`，不要将其视作一定存在的追踪值。
+
+本机 JSON 存储仅支持单进程，拒绝已存在的会话目录/文件符号链接；不保证抵御恶意本地进程并发换链。data 边界及其上级目录须受部署者保护，不是通用文件系统沙箱。
 
 建议总请求预算 120 秒、前端和反向代理等待至少 150 秒，具体通过实测调整。前端断开连接不代表云会话或模型请求已取消；先 GET 查看 `processing`、`last_request_id` 和 revision，再恢复交互。
 
@@ -197,4 +213,4 @@ chat 使用前端生成的唯一 `request_id`：相同 ID、相同请求体在�
 
 先用本文虚构数据做前端 mock：创建会话、问答、生成、确认、修改、恢复候选、刷新恢复和错误提示。重点验证旧版本确认被拒绝、双击不重复调用、未知不显示为符合、画像修改清除旧结果，以及来源文案不执行 HTML。
 
-后端实现后以 FastAPI `/openapi.json` 为字段契约，并维护与本文一致的固定测试样例；模型返回值不能直接成为 HTTP 响应。无需为此新增契约平台或独立服务。
+FastAPI `/openapi.json` 为字段契约；`backend/tests/test_api_flow.py` 使用 tmp_path 虚构目录、ScriptedAgent 及默认 factory LiteLLMAgent + 进程内本地 provider 桩，保留真实工具/service/store/rules，覆盖完整流程、版本、重放、失败原子性、否定画像、过期路线及越权草案；网络连接被阻断，非真实模型验收。模型返回值不能直接成为 HTTP 响应。无需为此新增契约平台或独立服务。
