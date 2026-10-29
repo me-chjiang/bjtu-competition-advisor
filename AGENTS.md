@@ -46,7 +46,7 @@
 ## 运行
 
 - Node ≥ 20，执行 `npm ci`。
-- 后端（Python ≥3.11，用 uv 管理）：`cd backend && uv run uvicorn main:app --host 127.0.0.1 --port 8000`；测试：`uv run pytest`
+- 后端（Python ≥3.10）：从仓库根目录运行 `python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --workers 1`，安装和测试见 `README.md`「本地 Python 后端」
 - 前端：`cd frontend && npm ci && npm run dev`（`127.0.0.1:5173`）；测试：`npm test`
   - 默认使用 mock；`VITE_MIS_API=real` 接真实 MIS 后端，`VITE_AGENT_API=real` 接真实 Agent 后端。
 - 冒烟测试：`node scripts/smoke-test.mjs`

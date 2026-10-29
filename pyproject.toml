@@ -1,0 +1,41 @@
+# AI-assisted backend packaging; dependency compatibility is tested locally only.
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bjtu-backend-mvp"
+version = "0.1.0"
+description = "Local competition matching backend"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi==0.143.3",
+    "pydantic==2.14.1",
+    "litellm==1.106.0",
+    "uvicorn==0.54.0",
+    "PyYAML==6.0.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "httpx==0.28.1",
+    "ruff==0.17.1",
+]
+
+[tool.setuptools.packages.find]
+include = ["backend*"]
+exclude = ["backend.tests*"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

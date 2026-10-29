@@ -1,0 +1,83 @@
+[
+  {
+    "competition_instance_id": "fictional_2026_open",
+    "name": "虚构竞赛：2026 校内算法挑战（AI 辅助生成，非真实通知）",
+    "series_id": "fictional_algorithm",
+    "year": 2026,
+    "group": "本科组",
+    "stage": "校内选拔",
+    "eligibility_description": "虚构规则：大二或大三，计算机或软件工程专业。",
+    "registration_start": "2026-10-01",
+    "registration_deadline": "2026-10-25",
+    "competition_date": "2026-11-15",
+    "allowed_grades": ["大二", "大三"],
+    "allowed_majors": ["计算机", "软件工程"],
+    "eligibility_evidence_ids": ["ev_fictional_open_2026"],
+    "registration_evidence_ids": ["ev_fictional_open_2026"],
+    "competition_date_evidence_ids": ["ev_fictional_open_2026"],
+    "evidence": [
+      {
+        "id": "ev_fictional_open_2026",
+        "url": "https://example.com/fictional/algorithm/2026",
+        "excerpt": "AI 辅助生成的虚构示例：2026 校内选拔本科组，大二/大三计算机或软件工程；10月1日至25日报名，11月15日比赛。并非真实通知。",
+        "fetched_at": "2026-10-17T10:00:00+08:00",
+        "applicable_year": 2026,
+        "scope": "applies-to/v1:{\"stage\":\"校内选拔\",\"group\":\"本科组\"}"
+      }
+    ]
+  },
+  {
+    "competition_instance_id": "fictional_2026_closed",
+    "name": "虚构竞赛：2026 校内设计挑战（AI 辅助生成，非真实通知）",
+    "series_id": "fictional_design",
+    "year": 2026,
+    "group": "本科组",
+    "stage": "校内选拔",
+    "eligibility_description": "虚构规则：大二或大三，计算机或设计专业。",
+    "registration_start": "2026-09-01",
+    "registration_deadline": "2026-10-10",
+    "competition_date": "2026-11-01",
+    "allowed_grades": ["大二", "大三"],
+    "allowed_majors": ["计算机", "设计"],
+    "eligibility_evidence_ids": ["ev_fictional_closed_2026"],
+    "registration_evidence_ids": ["ev_fictional_closed_2026"],
+    "competition_date_evidence_ids": ["ev_fictional_closed_2026"],
+    "evidence": [
+      {
+        "id": "ev_fictional_closed_2026",
+        "url": "https://example.com/fictional/design/2026",
+        "excerpt": "AI 辅助生成的虚构示例：2026 校内选拔本科组，大二/大三计算机或设计；9月1日至10月10日报名，11月1日比赛。并非真实通知。",
+        "fetched_at": "2026-10-17T10:00:00+08:00",
+        "applicable_year": 2026,
+        "scope": "applies-to/v1:{\"stage\":\"校内选拔\",\"group\":\"本科组\"}"
+      }
+    ]
+  },
+  {
+    "competition_instance_id": "fictional_2026_unknown",
+    "name": "虚构竞赛：2026 校内探索挑战（AI 辅助生成，本届待核实）",
+    "series_id": "fictional_exploration",
+    "year": 2026,
+    "group": "本科组",
+    "stage": "校内选拔",
+    "eligibility_description": "本届资格和日期未知；虚构往届材料仅供背景参考。",
+    "registration_start": null,
+    "registration_deadline": null,
+    "competition_date": null,
+    "allowed_grades": null,
+    "allowed_majors": null,
+    "eligibility_evidence_ids": [],
+    "registration_evidence_ids": [],
+    "competition_date_evidence_ids": [],
+    "evidence": [
+      {
+        "id": "ev_fictional_history_2025",
+        "url": "https://example.com/fictional/exploration/2025",
+        "excerpt": "AI 辅助生成的虚构往届示例：2025 年曾举行探索任务。不是2026年的资格或时间依据。",
+        "fetched_at": "2026-10-17T10:00:00+08:00",
+        "applicable_year": 2025,
+        "scope": "校内选拔 / 本科组（往届）"
+      }
+    ]
+  }
+]

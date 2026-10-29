@@ -10,9 +10,9 @@
   - 本次 MIS 入口跳转到 `sso.bjtu.edu.cn/o/authorize/`；可见表单位于 `iframe#loginIframe`，主 frame 的同名输入框隐藏。探测到 iframe 内 `input[name=username]`、`input[name=password]` 和 `a.login-btn`。
   - 页面接入腾讯验证码 frame，但提交后的挑战类型尚未实测，不能认定仍使用旧版算术验证码。
   - `lexmount-fetch` 加入 iframe 定位后，用户运行仍在填写阶段报 `locator.fill: Timeout 15000ms exceeded.`，停在上述 SSO 地址。尚未提交登录，超时根因未确定。
-  - 待排查：实际 frame 层级及加载时序、输入框定位、登录成功判定、教务系统 SSO 和 context 复用；`backend/collector.py` 的旧 CAS 假设需重新核验。
+  - 待排查：实际 frame 层级及加载时序、输入框定位、登录成功判定、教务系统 SSO 和 context 复用；旧 `collector.py` 的 CAS 假设需重新核验（10-29 已随旧后端删除，移植时处理）。
   - 详细记录与历史流程区分见 `教务系统/login-and-competition-guide.md`「2026-10-20 更新」。本次仅记问题，不重试登录或修改业务代码。
-- 实现：`backend/collector.py`（登录、采集）+ `frontend/` 登录页和等待页；接口见 `docs/api-contract.md`。
+- 实现：旧 MIS 后端 `collector.py`（登录、采集；10-29 删除，待移植进 main 的后端）+ `frontend/` 登录页和等待页；接口见 `docs/api-contract.md`。
 - 待定问题的结论：
   - 验证码：后端截图后显示在前端。
   - 凭据：不落盘；登录态靠持久化 context 保存。

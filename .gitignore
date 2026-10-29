@@ -15,7 +15,9 @@ data/
 # 前端构建产物与本地环境
 frontend/dist/
 frontend/.env.local
-# Python 后端虚拟环境与缓存
-backend/.venv/
+# Python development artifacts (real data remains under data/ above)
+.venv/
 __pycache__/
 .pytest_cache/
+.ruff_cache/
+*.egg-info/
