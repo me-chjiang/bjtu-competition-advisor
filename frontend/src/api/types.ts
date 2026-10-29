@@ -1,9 +1,5 @@
-// 与 docs/api-contract.md 保持同步
-
-export interface ApiErrorBody {
-  code: string;
-  message: string;
-}
+// 字段来自后端 OpenAPI（schema.d.ts，npm run gen:api 生成），行为规则见 docs/frontend-contract.md
+import type { components } from './schema';
 
 // ---- MIS ----
 
@@ -43,147 +39,53 @@ export interface MisStatus {
 
 // ---- Agent ----
 
-export const STAGES = ['profile', 'screen', 'review', 'route', 'done'] as const;
-export type Stage = (typeof STAGES)[number];
+type Schemas = components['schemas'];
 
-export interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  created_at: string;
-}
-
-export type SkillLevel = 'basic' | 'proficient' | 'expert';
-
-export interface Skill {
-  name: string;
-  level: SkillLevel;
-  evidence: string;
-}
-
-export interface Profile {
-  grade: string | null;
-  major: string | null;
-  discipline: string | null;
-  skills: Skill[];
-  weekly_hours: number | null;
-  goals: string[];
-  team_preference: 'individual' | 'team' | 'either' | null;
-  domains: string[];
-  notes: string | null;
-  version: number;
-  confirmed: boolean;
-}
-
-export type ProfilePatch = Partial<Omit<Profile, 'version' | 'confirmed'>>;
-
-export type Registration = 'open' | 'not_open' | 'closed' | 'unknown';
-
-export interface CandidateCard {
-  kind: 'candidate';
-  id: string;
-  competition_id: string;
-  name: string;
-  domain: string;
-  reason: string;
-  level: string | null;
-  category: 'A' | 'B' | 'C' | null;
-  registration: Registration;
-  status: 'kept' | 'excluded' | 'hidden';
-  exclusion: { type: 'hard' | 'user'; reason: string; evidence_ids: string[] } | null;
-  stale: boolean;
-}
-
-export type Tier = 'high' | 'medium' | 'low' | 'unknown';
-export type Basis = 'official' | 'inferred' | 'insufficient';
-export type Confidence = 'high' | 'medium' | 'low';
-
-export interface Dimension {
-  key: 'gap' | 'value' | 'time_cost' | 'difficulty' | 'schedule' | 'team';
-  label: string;
-  tier: Tier;
-  summary: string;
-  basis: Basis;
-  confidence: Confidence;
-  evidence_ids: string[];
-}
-
-export type RankKey = 'goal' | 'time' | 'risk';
-
-export interface ScorecardCard {
-  kind: 'scorecard';
-  id: string;
-  competition_id: string;
-  name: string;
-  summary: string;
+// 后端的默认值字段在 OpenAPI 里不是 required，但响应总会带上；Required 只处理一层，嵌套字段逐层声明
+type Req<T> = Required<T>;
+export type Skill = Req<Schemas['Skill']>;
+export type Profile = Omit<Req<Schemas['Profile']>, 'skills'> & { skills: Skill[] };
+export type ProfileChanges = Schemas['ProfileChanges'];
+export type Evidence = Req<Schemas['Evidence']>;
+export type Dimension = Req<Schemas['Dimension']>;
+export type CandidateCard = Omit<Req<Schemas['CandidateCard']>, 'dimensions' | 'evidence'> & {
   dimensions: Dimension[];
-  ranks: Record<RankKey, number>;
-  stale: boolean;
-}
-
-export interface RouteTask {
-  title: string;
-  hours_per_week: number;
-  acceptance: string;
-  start: string | null;
-  end: string | null;
-  date_certainty: 'confirmed' | 'estimated' | 'unknown';
-  assumptions: string[];
-}
-
-export interface RouteCard {
-  kind: 'route';
-  id: string;
-  items: { competition_id: string; name: string; tasks: RouteTask[] }[];
-  weekly_hours_total: number;
-  weekly_hours_available: number | null;
-  conflicts: { description: string; competition_ids: string[] }[];
-  pending_checks: string[];
-  stale: boolean;
-}
-
-export type Card = CandidateCard | ScorecardCard | RouteCard;
-
-export interface Session {
-  id: string;
-  stage: Stage;
-  messages: Message[];
-  profile: Profile;
-  cards: Card[];
-  needs_confirmation: boolean;
-}
-
-export interface ChatResponse {
-  message: Message;
-  stage: Stage;
-  profile: Profile;
-  cards: Card[];
-  needs_confirmation: boolean;
-}
-
-export interface Evidence {
-  id: string;
-  excerpt: string;
-  url: string;
-  fetched_at: string;
-  applies_to_year: string | null;
-  applies_to_group: string | null;
-  source_type: 'mis' | 'official_site' | 'notice' | 'other';
-  session_id: string | null;
-}
-
-export interface Competition {
-  id: string;
-  series: string;
-  name: string;
-  year: string;
-  level: string | null;
-  category: 'A' | 'B' | 'C' | null;
-  organizer: string | null;
-  format: string | null;
-  registration: { status: Registration; start: string | null; end: string | null };
-  description: string | null;
   evidence: Evidence[];
+};
+export type WeeklyLoad = Req<Schemas['WeeklyLoad']>;
+export type PlanTask = Req<Schemas['PlanTask']>;
+export type Plan = Omit<Req<Schemas['Plan']>, 'tasks' | 'weekly_load'> & {
+  tasks: PlanTask[];
+  weekly_load: WeeklyLoad[];
+};
+export type Message = Schemas['Message'];
+export type CompetitionDetail = Omit<Req<Schemas['CompetitionDetail']>, 'evidence'> & { evidence: Evidence[] };
+export type ErrorResponse = Schemas['ErrorResponse'];
+export type SessionSnapshot = Omit<Req<Schemas['SessionSnapshot']>, 'profile' | 'cards' | 'plan'> & {
+  profile: Profile;
+  cards: CandidateCard[];
+  plan: Plan | null;
+};
+
+export type Stage = SessionSnapshot['stage'];
+export type Status = SessionSnapshot['status'];
+export type Decision = CandidateCard['decision'];
+export type Eligibility = CandidateCard['eligibility'];
+export type RegistrationStatus = CandidateCard['registration_status'];
+export type DimensionName = Dimension['name'];
+export type Basis = Dimension['basis'];
+export type Feasibility = Plan['feasibility'];
+export type TeamPreference = NonNullable<Profile['team_preference']>;
+export type ChatAction = Schemas['ChatRequest']['action'];
+
+export const STAGES = ['R0', 'R1', 'R2', 'R4'] as const satisfies readonly Stage[];
+
+export interface ChatParams {
+  expected_revision: number;
+  action: ChatAction;
+  content: string | null;
+  // 不传则由 client 生成；传入只用于需要自己掌握 ID 的调用方和测试
+  request_id?: string;
 }
 
 export interface MisApi {
@@ -197,11 +99,12 @@ export interface MisApi {
 }
 
 export interface AgentApi {
-  createSession(): Promise<Session>;
-  getSession(id: string): Promise<Session>;
-  chat(id: string, content: string): Promise<ChatResponse>;
-  patchProfile(id: string, patch: ProfilePatch): Promise<{ profile: Profile; cards: Card[] }>;
-  confirm(id: string, stage: Stage, selectedCompetitionIds?: string[]): Promise<ChatResponse>;
-  patchCandidate(id: string, candidateId: string, status: 'kept' | 'excluded'): Promise<{ card: Card }>;
-  getCompetition(id: string): Promise<Competition>;
+  createSession(): Promise<SessionSnapshot>;
+  getSession(id: string): Promise<SessionSnapshot>;
+  // 失败时 ApiError.requestId 为本次请求的 ID，调用方据此对照快照的 last_request_id
+  chat(id: string, params: ChatParams): Promise<SessionSnapshot>;
+  patchProfile(id: string, expectedRevision: number, changes: ProfileChanges): Promise<SessionSnapshot>;
+  patchCandidate(id: string, candidateId: string, expectedRevision: number, decision: Decision): Promise<SessionSnapshot>;
+  confirm(id: string, expectedRevision: number, stage: Stage): Promise<SessionSnapshot>;
+  getCompetition(id: string): Promise<CompetitionDetail>;
 }

@@ -4,10 +4,8 @@ import { apiModes } from './api';
 
 <template>
   <header class="app-header">
-    <RouterLink to="/login" class="brand">北交大竞赛能力匹配</RouterLink>
-    <span class="modes" title="由 VITE_MIS_API / VITE_AGENT_API 控制">
-      MIS：{{ apiModes.mis }} · Agent：{{ apiModes.agent }}
-    </span>
+    <RouterLink to="/advisor" class="brand">北交大竞赛能力匹配</RouterLink>
+    <span class="modes" title="由 VITE_AGENT_API 控制">Agent：{{ apiModes.agent }}</span>
   </header>
   <main class="app-main">
     <RouterView />

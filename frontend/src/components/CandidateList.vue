@@ -1,79 +1,72 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { CandidateCard } from '../api/types';
-import { REGISTRATION_LABELS } from '../labels';
+import type { CandidateCard, Decision } from '../api/types';
+import { DECISION_LABELS, ELIGIBILITY_LABELS, formatTime, REGISTRATION_LABELS } from '../labels';
+import EvidenceItem from './EvidenceItem.vue';
 
-const props = defineProps<{ cards: CandidateCard[]; busy: boolean; editable: boolean }>();
+const props = defineProps<{ cards: CandidateCard[]; busy: boolean }>();
 const emit = defineEmits<{
-  setStatus: [candidateId: string, status: 'kept' | 'excluded'];
+  setDecision: [candidateId: string, decision: Decision];
   open: [competitionId: string, evidenceIds: string[]];
 }>();
 
-const kept = computed(() => {
-  const groups = new Map<string, CandidateCard[]>();
-  for (const c of props.cards.filter((c) => c.status === 'kept')) {
-    groups.set(c.domain, [...(groups.get(c.domain) ?? []), c]);
-  }
-  return [...groups.entries()];
-});
-const hidden = computed(() => props.cards.filter((c) => c.status === 'hidden'));
-const userExcluded = computed(() => props.cards.filter((c) => c.status === 'excluded' && c.exclusion?.type !== 'hard'));
-const hardExcluded = computed(() => props.cards.filter((c) => c.exclusion?.type === 'hard'));
+const DECISIONS: Decision[] = ['keep', 'defer', 'exclude'];
+const GROUP_TITLES: Record<Decision, string> = { keep: '已保留', defer: '待定', exclude: '已排除' };
+
+const groups = computed(() => DECISIONS.map((d) => ({
+  decision: d,
+  cards: props.cards.filter((c) => c.decision === d),
+})).filter((g) => g.cards.length));
 </script>
 
 <template>
   <div class="candidates">
-    <p class="muted small">已保留 {{ kept.reduce((n, [, g]) => n + g.length, 0) }} 项，按领域分组。</p>
-
-    <section v-for="[domain, group] in kept" :key="domain" class="group">
-      <h4>{{ domain }}</h4>
-      <article v-for="c in group" :key="c.id" class="candidate" :data-id="c.id">
+    <section v-for="g in groups" :key="g.decision" class="group">
+      <h4>{{ GROUP_TITLES[g.decision] }}（{{ g.cards.length }}）</h4>
+      <article
+        v-for="c in g.cards"
+        :key="c.competition_instance_id"
+        class="candidate"
+        :data-id="c.competition_instance_id"
+      >
         <div class="row">
-          <button class="link name" type="button" @click="emit('open', c.competition_id, [])">{{ c.name }}</button>
-          <span v-if="c.level" class="tag">{{ c.level }}</span>
-          <span v-if="c.category" class="tag">{{ c.category }} 类</span>
-          <span class="tag" :class="c.registration">{{ REGISTRATION_LABELS[c.registration] }}</span>
-          <span v-if="c.stale" class="tag stale">待更新</span>
-          <span class="spacer" />
-          <button v-if="editable" type="button" :disabled="busy" @click="emit('setStatus', c.id, 'excluded')">排除</button>
+          <button class="link name" type="button" @click="emit('open', c.competition_instance_id, [])">{{ c.name }}</button>
+          <span class="tag" :class="c.registration_status">{{ REGISTRATION_LABELS[c.registration_status] }}</span>
+          <span class="tag" :class="c.eligibility">{{ ELIGIBILITY_LABELS[c.eligibility] }}</span>
         </div>
-        <p class="muted">{{ c.reason }}</p>
+        <div class="muted small">
+          报名截止：{{ formatTime(c.registration_deadline) || '待定' }}
+        </div>
+        <p>{{ c.reason }}</p>
+        <div class="row decisions" role="group" :aria-label="`${c.name}的处理方式`">
+          <button
+            v-for="d in DECISIONS"
+            :key="d"
+            type="button"
+            :data-decision="d"
+            :class="{ active: c.decision === d }"
+            :disabled="busy || c.decision === d || (d === 'keep' && c.eligibility === 'ineligible')"
+            :title="d === 'keep' && c.eligibility === 'ineligible' ? '存在明确资格冲突，不能保留' : undefined"
+            @click="emit('setDecision', c.competition_instance_id, d)"
+          >
+            {{ DECISION_LABELS[d] }}
+          </button>
+        </div>
+        <details v-if="c.evidence.length" class="evidence-list">
+          <summary class="muted small">证据（{{ c.evidence.length }}）</summary>
+          <EvidenceItem v-for="e in c.evidence" :key="e.id" :evidence="e" />
+        </details>
       </article>
     </section>
-
-    <details v-if="hidden.length || userExcluded.length" open>
-      <summary>暂不展示 / 已排除（{{ hidden.length + userExcluded.length }}，可恢复）</summary>
-      <article v-for="c in [...hidden, ...userExcluded]" :key="c.id" class="candidate dim" :data-id="c.id">
-        <div class="row">
-          <button class="link name" type="button" @click="emit('open', c.competition_id, [])">{{ c.name }}</button>
-          <span class="tag">{{ c.status === 'hidden' ? '相关性较低' : '你已排除' }}</span>
-          <span class="spacer" />
-          <button v-if="editable" type="button" :disabled="busy" @click="emit('setStatus', c.id, 'kept')">恢复</button>
-        </div>
-        <p class="muted">{{ c.reason }}</p>
-      </article>
-    </details>
-
-    <details v-if="hardExcluded.length">
-      <summary>明确冲突（{{ hardExcluded.length }}，不能恢复）</summary>
-      <article v-for="c in hardExcluded" :key="c.id" class="candidate dim" :data-id="c.id">
-        <div class="row">
-          <button class="link name" type="button" @click="emit('open', c.competition_id, c.exclusion!.evidence_ids)">
-            {{ c.name }}
-          </button>
-          <span class="tag closed">硬性排除</span>
-        </div>
-        <p class="muted">依据：{{ c.exclusion!.reason }}</p>
-      </article>
-    </details>
+    <p v-if="!groups.length" class="muted">暂无候选。</p>
   </div>
 </template>
 
 <style scoped>
 .group { margin-bottom: 12px; }
 .candidate { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; }
-.candidate.dim { background: #fafbfc; }
 .name { font-weight: 600; text-align: left; }
-details { margin-top: 10px; }
-summary { cursor: pointer; margin-bottom: 6px; color: var(--muted); }
+.decisions { margin: 6px 0; }
+.decisions button.active { background: var(--primary-weak); border-color: var(--primary); color: var(--primary); }
+.evidence-list summary { cursor: pointer; }
 </style>

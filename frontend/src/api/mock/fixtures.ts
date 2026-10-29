@@ -1,210 +1,181 @@
-// 虚构示例数据，仅供 mock 演示，不代表任何真实竞赛的信息
-import type { CandidateCard, Competition, Profile, RouteTask, ScorecardCard } from '../types';
+// AI 辅助生成的虚构示例数据，仅供 mock 演示，不代表任何真实竞赛的信息
+import type {
+  CandidateCard, CompetitionDetail, Decision, Dimension, Evidence, Profile, RegistrationStatus,
+} from '../types';
+import { daysFromToday } from './util';
 
 const EX = 'https://example.com/competitions';
 const FETCHED = '2026-10-15T10:00:00+08:00';
+const THIS_YEAR_SCOPE = 'applies-to/v1:{"stage":"校内选拔","group":"本科组"}';
 
-export const DRAFT_PROFILE: Omit<Profile, 'version' | 'confirmed'> = {
+export const DRAFT_PROFILE: Profile = {
   grade: '大二',
   major: '计算机科学与技术',
-  discipline: '工学',
   skills: [
-    { name: 'Python', level: 'proficient', evidence: '课程大作业：爬虫 + 数据分析（示例）' },
-    { name: '数据结构与算法', level: 'basic', evidence: '课程成绩良好，刷题约 80 道（示例）' },
-    { name: '高等数学', level: 'proficient', evidence: '期末 90 分（示例）' },
+    { name: 'Python', evidence: '课程大作业：爬虫 + 数据分析（示例）' },
+    { name: '数据结构与算法', evidence: '课程成绩良好，刷题约 80 道（示例）' },
+    { name: '高等数学', evidence: '期末 90 分（示例）' },
   ],
   weekly_hours: 8,
   goals: ['保研', '简历'],
   team_preference: 'either',
-  domains: ['算法编程', '数学建模'],
-  notes: null,
+  unavailable_dates: [],
+  additional_context: null,
 };
 
-function competition(
-  id: string,
-  name: string,
-  extra: Partial<Competition> & Pick<Competition, 'registration'>,
-): Competition {
-  return {
-    id,
-    series: name.replace('（示例）', ''),
-    name,
-    year: '2026',
-    level: '国家级',
-    category: 'A',
-    organizer: '示例主办单位',
-    format: '组队 / 线下',
-    description: `${name}的示例说明文字。`,
-    evidence: [
-      {
-        id: `${id}-e1`,
-        excerpt: `【MIS】${name}，级别：国家级，报名时间见通知（示例摘录）`,
-        url: `${EX}/${id}/mis`,
-        fetched_at: FETCHED,
-        applies_to_year: '2026',
-        applies_to_group: '本科组',
-        source_type: 'mis',
-        session_id: 'mock-session-001',
-      },
-      {
-        id: `${id}-e2`,
-        excerpt: `【官网】往届赛题以综合应用为主，需团队协作（示例摘录）`,
-        url: `${EX}/${id}/official`,
-        fetched_at: FETCHED,
-        applies_to_year: '2025',
-        applies_to_group: null,
-        source_type: 'official_site',
-        session_id: null,
-      },
-    ],
-    ...extra,
-  };
+export const EMPTY_PROFILE: Profile = {
+  grade: null, major: null, skills: [], weekly_hours: null, goals: [],
+  team_preference: null, unavailable_dates: [], additional_context: null,
+};
+
+function evidence(id: string, name: string): Evidence[] {
+  return [
+    {
+      id: `${id}-e1`,
+      url: `${EX}/${id}/notice`,
+      excerpt: `${name}本届通知：本科生可报名，报名时间见通知（示例摘录）`,
+      fetched_at: FETCHED,
+      applicable_year: 2026,
+      scope: THIS_YEAR_SCOPE,
+    },
+    {
+      id: `${id}-e2`,
+      url: `${EX}/${id}/archive`,
+      excerpt: '往届赛题以综合应用为主，需团队协作（示例摘录）',
+      fetched_at: FETCHED,
+      applicable_year: 2025,
+      scope: '往届校内选拔',
+    },
+  ];
 }
 
-export const COMPETITIONS: Competition[] = [
-  competition('c-algo', '程序设计竞赛（示例）', {
-    registration: { status: 'open', start: '2026-10-01', end: '2026-10-30' },
-  }),
-  competition('c-model', '数学建模竞赛（示例）', {
-    format: '3 人组队 / 线上',
-    registration: { status: 'not_open', start: '2026-11-10', end: null },
-  }),
-  competition('c-data', '数据分析挑战赛（示例）', {
-    level: '省部级',
-    category: 'B',
-    format: '个人或组队 / 线上',
-    registration: { status: 'unknown', start: null, end: null },
-  }),
-  competition('c-robot', '智能机器人竞赛（示例）', {
-    category: 'B',
-    registration: { status: 'open', start: '2026-10-05', end: '2026-11-05' },
-  }),
-  competition('c-math', '数学竞赛（示例）', {
-    category: 'A',
-    format: '个人 / 线下',
-    registration: { status: 'closed', start: '2026-09-01', end: '2026-09-30' },
-  }),
-  competition('c-design', '工业设计大赛（示例）', {
-    level: '省部级',
-    category: 'C',
-    registration: { status: 'open', start: '2026-10-10', end: '2026-12-01' },
-  }),
+interface Spec {
+  id: string;
+  name: string;
+  status: RegistrationStatus;
+  deadlineOffset: number | null;
+  eligibility: CandidateCard['eligibility'];
+  decision: Decision;
+  reason: string;
+}
+
+const SPECS: Spec[] = [
+  { id: 'c-algo', name: '程序设计竞赛（示例）', status: 'open', deadlineOffset: 20, eligibility: 'eligible',
+    decision: 'keep', reason: '你有算法基础并想提升编程能力' },
+  { id: 'c-model', name: '数学建模竞赛（示例）', status: 'upcoming', deadlineOffset: 45, eligibility: 'eligible',
+    decision: 'keep', reason: '数学成绩好，且不排斥组队' },
+  { id: 'c-data', name: '数据分析挑战赛（示例）', status: 'unknown', deadlineOffset: null, eligibility: 'unknown',
+    decision: 'defer', reason: 'Python 数据分析经验可直接复用，但本届报名资格和时间尚未核实' },
+  { id: 'c-robot', name: '智能机器人竞赛（示例）', status: 'open', deadlineOffset: 14, eligibility: 'eligible',
+    decision: 'defer', reason: '与编程相关，但需要硬件经验' },
+  { id: 'c-design', name: '工业设计大赛（示例）', status: 'open', deadlineOffset: 60, eligibility: 'eligible',
+    decision: 'exclude', reason: '领域相关性较弱，供参考' },
+  { id: 'c-math', name: '数学竞赛（示例）', status: 'closed', deadlineOffset: -10, eligibility: 'ineligible',
+    decision: 'exclude', reason: '本届报名已截止，不能再报名' },
 ];
 
-const base = { kind: 'candidate', status: 'kept', exclusion: null, stale: false } as const;
+const deadlineOf = (offset: number | null) => (offset === null ? null : `${daysFromToday(offset)}T23:59:00+08:00`);
 
-export const CANDIDATES: CandidateCard[] = [
-  { ...base, id: 'cand-algo', competition_id: 'c-algo', name: '程序设计竞赛（示例）', domain: '算法编程',
-    reason: '你有算法基础并想提升编程能力', level: '国家级', category: 'A', registration: 'open' },
-  { ...base, id: 'cand-data', competition_id: 'c-data', name: '数据分析挑战赛（示例）', domain: '算法编程',
-    reason: 'Python 数据分析经验可直接复用', level: '省部级', category: 'B', registration: 'unknown' },
-  { ...base, id: 'cand-model', competition_id: 'c-model', name: '数学建模竞赛（示例）', domain: '数学建模',
-    reason: '数学成绩好，且偏好组队', level: '国家级', category: 'A', registration: 'not_open' },
-  { ...base, id: 'cand-robot', competition_id: 'c-robot', name: '智能机器人竞赛（示例）', domain: '工程实践',
-    reason: '与编程相关，但需要硬件经验', level: '国家级', category: 'B', registration: 'open', status: 'hidden' },
-  { ...base, id: 'cand-math', competition_id: 'c-math', name: '数学竞赛（示例）', domain: '数学建模',
-    reason: '数学基础较好', level: '国家级', category: 'A', registration: 'closed', status: 'excluded',
-    exclusion: { type: 'hard', reason: '本年度报名已于 2026-09-30 截止', evidence_ids: ['c-math-e1'] } },
-  { ...base, id: 'cand-design', competition_id: 'c-design', name: '工业设计大赛（示例）', domain: '设计创意',
-    reason: '领域相关性较弱，供参考', level: '省部级', category: 'C', registration: 'open', status: 'hidden' },
-];
+export const CANDIDATES: CandidateCard[] = SPECS.map((s) => ({
+  competition_instance_id: s.id,
+  name: s.name,
+  registration_status: s.status,
+  registration_deadline: deadlineOf(s.deadlineOffset),
+  eligibility: s.eligibility,
+  decision: s.decision,
+  reason: s.reason,
+  dimensions: [],
+  evidence: evidence(s.id, s.name),
+}));
 
-type Dim = ScorecardCard['dimensions'][number];
-const dim = (key: Dim['key'], label: string, tier: Dim['tier'], summary: string,
-  basis: Dim['basis'], confidence: Dim['confidence'], evidence_ids: string[] = []): Dim =>
-  ({ key, label, tier, summary, basis, confidence, evidence_ids });
+export const COMPETITIONS: CompetitionDetail[] = SPECS.map((s) => ({
+  competition_instance_id: s.id,
+  name: s.name,
+  series_id: s.id.replace('c-', 's-'),
+  year: 2026,
+  group: '本科组',
+  stage: '校内选拔',
+  eligibility_description: s.eligibility === 'ineligible' ? '仅限已通过资格审核的在籍学生（示例）' : '全日制在籍本科生（示例）',
+  registration_status: s.status,
+  registration_start: s.status === 'upcoming' ? daysFromToday(30) : s.status === 'unknown' ? null : daysFromToday(-20),
+  registration_deadline: deadlineOf(s.deadlineOffset),
+  competition_date: s.status === 'unknown' ? null : daysFromToday((s.deadlineOffset ?? 0) + 30),
+  evidence: evidence(s.id, s.name),
+}));
 
-export const SCORECARDS: Record<string, Omit<ScorecardCard, 'kind' | 'stale'>> = {
-  'c-algo': {
-    id: 'sc-algo', competition_id: 'c-algo', name: '程序设计竞赛（示例）',
-    summary: '与目标高度相关，主要差距在图论与动态规划',
-    ranks: { goal: 1, time: 3, risk: 3 },
-    dimensions: [
-      dim('gap', '能力差距', 'medium', '需补图论、动态规划', 'inferred', 'medium', ['c-algo-e2']),
-      dim('value', '目标价值', 'high', 'MIS 标注国家级 A 类', 'official', 'high', ['c-algo-e1']),
-      dim('time_cost', '时间成本', 'high', '预计每周 6 小时以上', 'inferred', 'medium'),
-      dim('difficulty', '准备难度', 'high', '往届题目难度较高', 'inferred', 'low', ['c-algo-e2']),
-      dim('schedule', '赛程冲突', 'low', '与期末考试不重叠', 'official', 'medium', ['c-algo-e1']),
-      dim('team', '组队需求', 'medium', '3 人一队，需要找队友', 'official', 'high', ['c-algo-e2']),
-    ],
-  },
-  'c-data': {
-    id: 'sc-data', competition_id: 'c-data', name: '数据分析挑战赛（示例）',
-    summary: '技能匹配度最高，但报名时间未知',
-    ranks: { goal: 3, time: 1, risk: 2 },
-    dimensions: [
-      dim('gap', '能力差距', 'low', 'Python 数据分析可直接复用', 'inferred', 'medium'),
-      dim('value', '目标价值', 'medium', '省部级 B 类', 'official', 'high', ['c-data-e1']),
-      dim('time_cost', '时间成本', 'low', '预计每周 3 小时', 'inferred', 'medium'),
-      dim('difficulty', '准备难度', 'medium', '赛题开放，评审标准未公开', 'insufficient', 'low'),
-      dim('schedule', '赛程冲突', 'unknown', '今年赛程尚未公布', 'insufficient', 'low'),
-      dim('team', '组队需求', 'low', '可个人参赛', 'official', 'high', ['c-data-e1']),
-    ],
-  },
-  'c-model': {
-    id: 'sc-model', competition_id: 'c-model', name: '数学建模竞赛（示例）',
-    summary: '数学基础匹配，需要补建模论文写作',
-    ranks: { goal: 2, time: 2, risk: 1 },
-    dimensions: [
-      dim('gap', '能力差距', 'medium', '需补论文写作与常用模型', 'inferred', 'medium', ['c-model-e2']),
-      dim('value', '目标价值', 'high', 'MIS 标注国家级 A 类', 'official', 'high', ['c-model-e1']),
-      dim('time_cost', '时间成本', 'medium', '赛前集训约 4 周', 'inferred', 'medium'),
-      dim('difficulty', '准备难度', 'medium', '入门资料丰富', 'inferred', 'medium'),
-      dim('schedule', '赛程冲突', 'low', '比赛在 11 月，不与考试重叠', 'inferred', 'low'),
-      dim('team', '组队需求', 'high', '必须 3 人组队', 'official', 'high', ['c-model-e2']),
-    ],
-  },
-  'c-robot': {
-    id: 'sc-robot', competition_id: 'c-robot', name: '智能机器人竞赛（示例）',
-    summary: '需要硬件经验，差距较大',
-    ranks: { goal: 4, time: 4, risk: 4 },
-    dimensions: [
-      dim('gap', '能力差距', 'high', '缺少嵌入式和硬件经验', 'inferred', 'medium'),
-      dim('value', '目标价值', 'medium', '国家级 B 类', 'official', 'high', ['c-robot-e1']),
-      dim('time_cost', '时间成本', 'high', '需要长期实验室投入', 'inferred', 'low'),
-      dim('difficulty', '准备难度', 'high', '需要实物调试', 'inferred', 'medium'),
-      dim('schedule', '赛程冲突', 'unknown', '决赛时间未公布', 'insufficient', 'low'),
-      dim('team', '组队需求', 'high', '5 人团队', 'official', 'medium', ['c-robot-e2']),
-    ],
-  },
-  'c-design': {
-    id: 'sc-design', competition_id: 'c-design', name: '工业设计大赛（示例）',
-    summary: '领域相关性弱，仅作探索',
-    ranks: { goal: 5, time: 5, risk: 5 },
-    dimensions: [
-      dim('gap', '能力差距', 'high', '缺少设计作品集', 'inferred', 'medium'),
-      dim('value', '目标价值', 'low', '省部级 C 类', 'official', 'high', ['c-design-e1']),
-      dim('time_cost', '时间成本', 'medium', '作品制作约 3 周', 'inferred', 'low'),
-      dim('difficulty', '准备难度', 'medium', '评审偏主观', 'insufficient', 'low'),
-      dim('schedule', '赛程冲突', 'low', '截止 12 月初', 'official', 'medium', ['c-design-e1']),
-      dim('team', '组队需求', 'low', '可个人参赛', 'official', 'medium'),
-    ],
-  },
-};
+const dim = (
+  name: Dimension['name'], assessment: string, basis: Dimension['basis'], evidenceIds: string[] = [],
+  uncertainties: string[] = [],
+): Dimension => ({ name, assessment, basis, evidence_ids: evidenceIds, uncertainties });
 
-export const ROUTE_TASKS: Record<string, RouteTask[]> = {
+export const DIMENSIONS: Record<string, Dimension[]> = {
   'c-algo': [
-    { title: '图论与动态规划专题训练', hours_per_week: 4, acceptance: '完成 40 道专题题，独立 AC 率 ≥ 60%',
-      start: '2026-10-20', end: '2026-11-30', date_certainty: 'estimated', assumptions: ['每周可稳定投入 4 小时'] },
-    { title: '组队并完成 3 场模拟赛', hours_per_week: 3, acceptance: '模拟赛排名进入前 50%',
-      start: '2026-12-01', end: '2026-12-20', date_certainty: 'estimated', assumptions: ['比赛日期沿用往年，待核实'] },
-  ],
-  'c-data': [
-    { title: '复习 pandas 与可视化，完成 1 个完整分析报告', hours_per_week: 3, acceptance: '报告包含数据清洗、建模和结论',
-      start: null, end: null, date_certainty: 'unknown', assumptions: ['今年赛程未公布'] },
+    dim('ability_gap', '需补图论、动态规划', 'inferred', ['c-algo-e2'], ['今年题型未知']),
+    dim('goal_value', '与保研、简历目标高度相关', 'explicit', ['c-algo-e1']),
+    dim('time_cost', '预计每周 4–6 小时', 'inferred', [], ['按往届强度估算']),
+    dim('preparation_risk', '往届题目难度较高', 'inferred', ['c-algo-e2']),
+    dim('team_requirement', '3 人一队，需要找队友', 'explicit', ['c-algo-e1']),
+    dim('schedule_conflict', '与期末考试不重叠', 'explicit', ['c-algo-e1']),
   ],
   'c-model': [
-    { title: '学习常用模型并精读 3 篇优秀论文', hours_per_week: 3, acceptance: '能独立写出模型假设与求解章节',
-      start: '2026-10-20', end: '2026-11-10', date_certainty: 'estimated', assumptions: ['报名开放时间按 MIS 显示'] },
-    { title: '组队完成 1 次 72 小时模拟', hours_per_week: 5, acceptance: '提交完整论文并互评',
-      start: '2026-11-01', end: '2026-11-10', date_certainty: 'estimated', assumptions: ['已找到 2 名队友'] },
+    dim('ability_gap', '需补论文写作与常用模型', 'inferred', ['c-model-e2']),
+    dim('goal_value', '与保研目标相关', 'explicit', ['c-model-e1']),
+    dim('time_cost', '赛前集训约 3 周', 'inferred', [], ['集训安排未公布']),
+    dim('preparation_risk', '入门资料丰富，风险中等', 'inferred'),
+    dim('team_requirement', '必须 3 人组队', 'explicit', ['c-model-e1']),
+    dim('schedule_conflict', '比赛时间待通知', 'unknown', [], ['本届赛程尚未公布']),
+  ],
+  'c-data': [
+    dim('ability_gap', 'Python 数据分析可直接复用', 'inferred'),
+    dim('goal_value', '与简历目标相关', 'inferred', [], ['本届规模和级别未核实']),
+    dim('time_cost', '预计每周 3 小时', 'inferred'),
+    dim('preparation_risk', '评审标准未公开', 'unknown', [], ['评审标准未公开']),
+    dim('team_requirement', '可个人参赛', 'explicit', ['c-data-e1']),
+    dim('schedule_conflict', '今年赛程尚未公布', 'unknown'),
   ],
   'c-robot': [
-    { title: '学习嵌入式基础并加入实验室', hours_per_week: 6, acceptance: '完成 1 个小车控制实验',
-      start: '2026-10-20', end: '2027-01-15', date_certainty: 'estimated', assumptions: ['实验室接收新成员'] },
+    dim('ability_gap', '缺少嵌入式和硬件经验', 'inferred'),
+    dim('goal_value', '与保研目标有一定相关', 'explicit', ['c-robot-e1']),
+    dim('time_cost', '需要长期实验室投入', 'inferred'),
+    dim('preparation_risk', '需要实物调试，风险较高', 'inferred'),
+    dim('team_requirement', '5 人团队', 'explicit', ['c-robot-e1']),
+    dim('schedule_conflict', '决赛时间未公布', 'unknown'),
   ],
   'c-design': [
-    { title: '完成 1 件设计作品', hours_per_week: 4, acceptance: '作品说明书与效果图齐全',
-      start: '2026-11-01', end: '2026-12-01', date_certainty: 'confirmed', assumptions: [] },
+    dim('ability_gap', '缺少设计作品集', 'inferred'),
+    dim('goal_value', '与目标关联较弱', 'inferred'),
+    dim('time_cost', '作品制作约 3 周', 'inferred'),
+    dim('preparation_risk', '评审偏主观', 'unknown'),
+    dim('team_requirement', '可个人参赛', 'explicit', ['c-design-e1']),
+    dim('schedule_conflict', '截止日期较晚，冲突较小', 'explicit', ['c-design-e1']),
+  ],
+};
+
+export interface TaskSpec {
+  title: string;
+  hours: number | null;
+  acceptance: string;
+  startOffset: number | null;
+  dueOffset: number | null;
+}
+
+// 偏移量以「今天」为基准，保证 mock 方案不会因为时间流逝变成过期任务；工时留有余量，使默认组合在任何星期几都在 8 小时预算内
+export const TASK_SPECS: Record<string, TaskSpec[]> = {
+  'c-algo': [
+    { title: '图论与动态规划专题训练', hours: 12, acceptance: '完成 40 道专题题，独立 AC 率不低于 60%', startOffset: 1, dueOffset: 28 },
+    { title: '组队并完成 3 场模拟赛', hours: 4, acceptance: '模拟赛排名进入前 50%', startOffset: 29, dueOffset: 40 },
+  ],
+  'c-model': [
+    { title: '学习常用模型并精读 3 篇优秀论文', hours: 4, acceptance: '能独立写出模型假设与求解章节', startOffset: 1, dueOffset: 21 },
+    { title: '组队完成 1 次 72 小时模拟', hours: 6, acceptance: '提交完整论文并互评', startOffset: 22, dueOffset: 30 },
+  ],
+  'c-data': [
+    { title: '复习 pandas 与可视化，完成 1 个完整分析报告', hours: null, acceptance: '报告包含数据清洗、建模和结论', startOffset: null, dueOffset: null },
+  ],
+  'c-robot': [
+    { title: '学习嵌入式基础并加入实验室', hours: 60, acceptance: '完成 1 个小车控制实验', startOffset: 1, dueOffset: 60 },
+  ],
+  'c-design': [
+    { title: '完成 1 件设计作品', hours: 12, acceptance: '作品说明书与效果图齐全', startOffset: 3, dueOffset: 35 },
   ],
 };

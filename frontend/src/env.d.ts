@@ -3,6 +3,7 @@
 interface ImportMetaEnv {
   readonly VITE_MIS_API?: 'mock' | 'real';
   readonly VITE_AGENT_API?: 'mock' | 'real';
+  readonly VITE_API_BASE?: string;
 }
 
 declare module '*.vue' {

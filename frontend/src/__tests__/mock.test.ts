@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildRoute, mockAgentApi as api } from '../api/mock/agent';
-import type { LoginForm } from '../api/types';
+import { buildPlan, mockAgentApi as api } from '../api/mock/agent';
+import { CANDIDATES } from '../api/mock/fixtures';
+import type { CandidateCard, LoginForm, SessionSnapshot } from '../api/types';
+
+// 模拟网络延迟只影响演示手感，测试里跳过
+vi.mock('../api/mock/util', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../api/mock/util')>()),
+  delay: () => Promise.resolve(),
+}));
 
 beforeEach(() => {
   localStorage.clear();
@@ -12,77 +19,65 @@ async function expectCode(p: Promise<unknown>, code: string) {
   await expect(p).rejects.toMatchObject({ code });
 }
 
+const say = (s: SessionSnapshot, content = '大二计算机，会 Python') =>
+  api.chat(s.session_id, { expected_revision: s.revision, action: 'message', content });
+const generate = (s: SessionSnapshot) =>
+  api.chat(s.session_id, { expected_revision: s.revision, action: 'generate', content: null });
+const confirm = (s: SessionSnapshot) => api.confirm(s.session_id, s.revision, s.stage);
+
+// 推进到指定阶段的 collecting 状态（尚未生成该阶段结果）
+async function toStage(stage: 'R1' | 'R2' | 'R4') {
+  let s = await api.createSession();
+  s = await confirm(await say(s));
+  if (stage === 'R1') return s;
+  s = await confirm(await generate(s));
+  if (stage === 'R2') return s;
+  return confirm(await generate(s));
+}
+
 describe('mock agent 主线', () => {
-  it('R0 → R1 → R2 → R4 → done，刷新后可恢复', async () => {
-    const s = await api.createSession();
-    expect(s.stage).toBe('profile');
+  it('R0 → R1 → R2 → R4 → completed，每步 revision 加 1，刷新后可恢复', async () => {
+    let s = await api.createSession();
+    expect(s).toMatchObject({ stage: 'R0', status: 'collecting', revision: 0, plan: null, cards: [] });
 
-    let r = await api.chat(s.id, '大二计算机，会 Python');
-    expect(r.needs_confirmation).toBe(true);
-    expect(r.profile.major).toBe('计算机科学与技术');
+    s = await say(s);
+    expect(s).toMatchObject({ stage: 'R0', status: 'awaiting_review', needs_confirmation: true, revision: 1 });
+    expect(s.profile.major).toBe('计算机科学与技术');
+    expect(s.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
 
-    r = await api.confirm(s.id, 'profile');
-    expect(r.stage).toBe('screen');
-    expect(r.profile.confirmed).toBe(true);
+    s = await confirm(s);
+    expect(s).toMatchObject({ stage: 'R1', status: 'collecting', needs_confirmation: false, cards: [] });
+    s = await generate(s);
+    expect(s).toMatchObject({ stage: 'R1', status: 'awaiting_review', needs_confirmation: true });
+    expect(s.cards.length).toBe(CANDIDATES.length);
 
-    await api.patchCandidate(s.id, 'cand-robot', 'kept');
-    r = await api.confirm(s.id, 'screen');
-    expect(r.stage).toBe('review');
-    const scorecardIds = r.cards.filter((c) => c.kind === 'scorecard').map((c) => c.competition_id);
-    expect(scorecardIds).toContain('c-robot');
-    expect(scorecardIds).not.toContain('c-design');
+    s = await confirm(s);
+    expect(s).toMatchObject({ stage: 'R2', status: 'collecting' });
+    expect(s.cards.every((c) => c.dimensions.length === 0)).toBe(true);
+    s = await generate(s);
+    expect(s.cards.some((c) => c.dimensions.length > 0)).toBe(true);
 
-    await expectCode(api.confirm(s.id, 'review', []), 'VALIDATION_ERROR');
-    r = await api.confirm(s.id, 'review', ['c-algo', 'c-model']);
-    expect(r.stage).toBe('route');
-    const route = r.cards.find((c) => c.kind === 'route');
-    expect(route?.kind === 'route' && route.items.map((i) => i.competition_id)).toEqual(['c-algo', 'c-model']);
+    s = await confirm(s);
+    expect(s).toMatchObject({ stage: 'R4', status: 'collecting', plan: null });
+    s = await generate(s);
+    expect(s.plan?.feasibility).toBe('feasible');
+    s = await confirm(s);
+    expect(s).toMatchObject({ stage: 'R4', status: 'completed', needs_confirmation: false });
 
-    r = await api.confirm(s.id, 'route');
-    expect(r.stage).toBe('done');
-    expect(r.needs_confirmation).toBe(false);
-
-    const restored = await api.getSession(s.id);
-    expect(restored.stage).toBe('done');
-    expect(restored.messages.length).toBe(s.messages.length + 2 + 4);
+    expect(await api.getSession(s.session_id)).toEqual(s);
   });
 
-  it('重复确认同一阶段返回 STAGE_MISMATCH', async () => {
-    const s = await api.createSession();
-    await api.chat(s.id, 'hi');
-    await api.confirm(s.id, 'profile');
-    await expectCode(api.confirm(s.id, 'profile'), 'STAGE_MISMATCH');
+  it('confirm 不会自动生成下一阶段，必须显式 generate', async () => {
+    const s = await toStage('R1');
+    expect(s.cards).toEqual([]);
+    expect(s.needs_confirmation).toBe(false);
+    await expectCode(confirm(s), 'INVALID_STAGE');
   });
 
-  it('修改画像后结果标记为待更新，再次对话后清除', async () => {
+  it('R0 阶段不能 generate，message 内容不能为空', async () => {
     const s = await api.createSession();
-    await api.chat(s.id, 'hi');
-    await api.confirm(s.id, 'profile');
-    const { profile, cards } = await api.patchProfile(s.id, { weekly_hours: 3 });
-    expect(profile.weekly_hours).toBe(3);
-    expect(cards.every((c) => c.stale)).toBe(true);
-    const r = await api.chat(s.id, '请更新');
-    expect(r.cards.some((c) => c.stale)).toBe(false);
-  });
-
-  it('路线阶段重新生成后所有卡片都不再待更新', async () => {
-    const s = await api.createSession();
-    await api.chat(s.id, 'hi');
-    await api.confirm(s.id, 'profile');
-    await api.confirm(s.id, 'screen');
-    await api.confirm(s.id, 'review', ['c-algo', 'c-model']);
-    await api.patchProfile(s.id, { weekly_hours: 15 });
-    const r = await api.chat(s.id, '请更新');
-    expect(r.cards.some((c) => c.stale)).toBe(false);
-    const route = r.cards.find((c) => c.kind === 'route');
-    expect(route?.kind === 'route' && route.conflicts).toEqual([]);
-  });
-
-  it('硬性排除的候选不能恢复', async () => {
-    const s = await api.createSession();
-    await api.chat(s.id, 'hi');
-    await api.confirm(s.id, 'profile');
-    await expectCode(api.patchCandidate(s.id, 'cand-math', 'kept'), 'CANDIDATE_LOCKED');
+    await expectCode(generate(s), 'VALIDATION_ERROR');
+    await expectCode(say(s, '   '), 'VALIDATION_ERROR');
   });
 
   it('不存在的会话返回 SESSION_NOT_FOUND', async () => {
@@ -90,20 +85,121 @@ describe('mock agent 主线', () => {
   });
 });
 
-describe('buildRoute', () => {
-  it('统计高峰周投入并标出超出可投入时间的冲突', () => {
-    const route = buildRoute(['c-algo', 'c-model'], 8);
-    // 11-01 那一周：图论 4h + 论文 3h + 模拟 5h
-    expect(route.weekly_hours_total).toBe(12);
-    expect(route.conflicts.length).toBeGreaterThan(0);
-    expect(route.conflicts[0].competition_ids).toEqual(['c-algo', 'c-model']);
+describe('mock agent 并发与重放', () => {
+  it('旧 revision 被 REVISION_CONFLICT 拒绝，并带上当前版本', async () => {
+    const s0 = await api.createSession();
+    await say(s0);
+    await expect(say(s0)).rejects.toMatchObject({ code: 'REVISION_CONFLICT', status: 409, details: { current_revision: 1 } });
+    await expectCode(api.confirm(s0.session_id, 0, 'R0'), 'REVISION_CONFLICT');
+    await expectCode(api.patchProfile(s0.session_id, 0, { grade: '大三' }), 'REVISION_CONFLICT');
   });
 
-  it('未知日期的任务列入待核实，不计入每周总投入', () => {
-    const route = buildRoute(['c-data'], 8);
-    expect(route.weekly_hours_total).toBe(0);
-    expect(route.conflicts).toEqual([]);
-    expect(route.pending_checks[0]).toContain('日期待定');
+  it('相同 request_id 重放返回缓存结果，不再次修改；请求体不同则 REQUEST_ID_REUSED', async () => {
+    const s0 = await api.createSession();
+    const params = { request_id: 'req-1', expected_revision: 0, action: 'message' as const, content: '你好' };
+    const first = await api.chat(s0.session_id, params);
+    const live = await confirm(first);
+    expect(first.last_request_id).toBe('req-1');
+
+    // 重放先于 revision 检查：用已过期的版本号重发同一请求仍得到原结果
+    const replay = await api.chat(s0.session_id, params);
+    expect(replay).toEqual(first);
+    expect(replay.revision).toBeLessThan(live.revision);
+    expect((await api.getSession(s0.session_id)).revision).toBe(live.revision);
+
+    await expectCode(api.chat(s0.session_id, { ...params, content: '另一句' }), 'REQUEST_ID_REUSED');
+  });
+});
+
+describe('mock agent 失效规则', () => {
+  it('画像有改动：回到 R0 并清空候选和路线；无改动不增加 revision', async () => {
+    let s = await toStage('R4');
+    s = await generate(s);
+    expect(s.plan).not.toBeNull();
+
+    const same = await api.patchProfile(s.session_id, s.revision, { weekly_hours: s.profile.weekly_hours });
+    expect(same.revision).toBe(s.revision);
+
+    const next = await api.patchProfile(s.session_id, s.revision, { weekly_hours: 4, goals: ['竞赛经历'] });
+    expect(next).toMatchObject({ stage: 'R0', status: 'collecting', needs_confirmation: false, cards: [], plan: null });
+    expect(next.profile).toMatchObject({ weekly_hours: 4, goals: ['竞赛经历'], major: s.profile.major });
+    expect(next.revision).toBe(s.revision + 1);
+  });
+
+  it('R2/R4 修改候选：回到 R1 awaiting_review，清除精查结论和方案，保留粗筛决定', async () => {
+    let s = await toStage('R2');
+    s = await generate(s);
+    expect(s.cards.some((c) => c.dimensions.length)).toBe(true);
+
+    s = await api.patchCandidate(s.session_id, 'c-data', s.revision, 'exclude');
+    expect(s).toMatchObject({ stage: 'R1', status: 'awaiting_review', needs_confirmation: true, plan: null });
+    expect(s.cards.every((c) => c.dimensions.length === 0)).toBe(true);
+    expect(s.cards.find((c) => c.competition_instance_id === 'c-data')?.decision).toBe('exclude');
+    expect(s.cards.find((c) => c.competition_instance_id === 'c-algo')?.decision).toBe('keep');
+  });
+
+  it('R1 修改候选仍在 R1；R0 不能修改候选', async () => {
+    const r0 = await say(await api.createSession());
+    await expectCode(api.patchCandidate(r0.session_id, 'c-algo', r0.revision, 'defer'), 'INVALID_STAGE');
+    let s = await generate(await confirm(r0));
+    s = await api.patchCandidate(s.session_id, 'c-algo', s.revision, 'defer');
+    expect(s.stage).toBe('R1');
+    await expectCode(api.patchCandidate(s.session_id, 'nope', s.revision, 'keep'), 'COMPETITION_NOT_FOUND');
+  });
+
+  it('资格冲突的候选不能设为 keep', async () => {
+    let s = await generate(await toStage('R1'));
+    const math = s.cards.find((c) => c.competition_instance_id === 'c-math')!;
+    expect(math.eligibility).toBe('ineligible');
+    await expectCode(api.patchCandidate(s.session_id, 'c-math', s.revision, 'keep'), 'VALIDATION_ERROR');
+    s = await api.patchCandidate(s.session_id, 'c-math', s.revision, 'defer');
+    expect(s.cards.find((c) => c.competition_instance_id === 'c-math')?.decision).toBe('defer');
+  });
+
+  it('没有保留候选时不能确认 R1；重新生成保留用户的决定', async () => {
+    let s = await generate(await toStage('R1'));
+    s = await api.patchCandidate(s.session_id, 'c-algo', s.revision, 'defer');
+    s = await api.patchCandidate(s.session_id, 'c-model', s.revision, 'defer');
+    await expectCode(confirm(s), 'VALIDATION_ERROR');
+    s = await generate(s);
+    expect(s.cards.find((c) => c.competition_instance_id === 'c-algo')?.decision).toBe('defer');
+  });
+
+  it('不可行的方案不能确认 R4', async () => {
+    let s = await generate(await toStage('R1'));
+    s = await api.patchCandidate(s.session_id, 'c-robot', s.revision, 'keep');
+    s = await generate(await confirm(s));
+    s = await generate(await confirm(s));
+    expect(s.plan?.feasibility).toBe('infeasible');
+    expect(s.plan?.conflicts.length).toBeGreaterThan(0);
+    await expectCode(confirm(s), 'VALIDATION_ERROR');
+  });
+});
+
+describe('buildPlan', () => {
+  const kept = (ids: string[]): CandidateCard[] => CANDIDATES.map((c) => ({
+    ...structuredClone(c),
+    decision: ids.includes(c.competition_instance_id) ? 'keep' : 'exclude',
+    dimensions: [{ name: 'goal_value', assessment: 'x', basis: 'inferred', evidence_ids: [], uncertainties: [] }],
+  }));
+
+  it('周一对齐，预算对比负载，超出预算判为 infeasible', () => {
+    const plan = buildPlan(kept(['c-algo', 'c-robot']), 8);
+    expect(plan.weekly_load.every((w) => new Date(`${w.week_start}T00:00:00Z`).getUTCDay() === 1)).toBe(true);
+    expect(plan.feasibility).toBe('infeasible');
+    expect(plan.conflicts.length).toBeGreaterThan(0);
+  });
+
+  it('预算或任务工时、日期未知时为 unknown，未知任务不计入负载', () => {
+    expect(buildPlan(kept(['c-algo']), null).feasibility).toBe('unknown');
+    const plan = buildPlan(kept(['c-data']), 8);
+    expect(plan.feasibility).toBe('unknown');
+    expect(plan.weekly_load).toEqual([]);
+    expect(plan.tasks[0]).toMatchObject({ estimated_hours: null, start_date: null, due_date: null });
+  });
+
+  it('预算内且信息完整时为 feasible', () => {
+    expect(buildPlan(kept(['c-algo', 'c-model']), 8).feasibility).toBe('feasible');
   });
 });
 
