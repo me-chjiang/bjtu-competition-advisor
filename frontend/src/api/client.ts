@@ -1,5 +1,5 @@
 import type {
-  AgentApi, ChatParams, CompetitionDetail, ErrorResponse, MisApi, SessionSnapshot,
+  AgentApi, ChatParams, CompetitionDetail, ErrorResponse, LlmSettings, MisApi, SessionSnapshot,
 } from './types';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '/api';
@@ -91,4 +91,6 @@ export const realAgentApi: AgentApi = {
   confirm: (id, expectedRevision, stage) =>
     request<SessionSnapshot>('POST', `/sessions/${seg(id)}/confirm`, { expected_revision: expectedRevision, stage }),
   getCompetition: (id) => request<CompetitionDetail>('GET', `/competitions/${seg(id)}`),
+  getLlmSettings: () => request<LlmSettings>('GET', '/settings/llm'),
+  patchLlmSettings: (patch) => request<LlmSettings>('PATCH', '/settings/llm', patch),
 };

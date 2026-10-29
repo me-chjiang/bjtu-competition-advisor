@@ -114,6 +114,23 @@ class ConfirmRequest(DTO):
     stage: Stage
 
 
+LLM_MODELS = ("deepseek/deepseek-chat", "deepseek/deepseek-reasoner")
+LLMModel = Literal["deepseek/deepseek-chat", "deepseek/deepseek-reasoner"]
+
+
+class LLMSettingsPatch(DTO):
+    api_key: Annotated[str, Field(min_length=1, max_length=512)] | None = None
+    model: LLMModel | None = None
+
+
+class LLMSettingsView(DTO):
+    """Never carries the key itself, only whether one is held in memory."""
+
+    configured: bool
+    model: str
+    available_models: list[str]
+
+
 class Message(DTO):
     id: NonemptyString
     role: Literal["user", "assistant"]

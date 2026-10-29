@@ -20,6 +20,7 @@ from backend.agent import LiteLLMAgent
 from backend.catalog import CompetitionCatalog
 from backend.config import Settings
 from backend.schemas import (
+    LLM_MODELS,
     AgentRunner,
     AppError,
     CandidatePatchRequest,
@@ -29,6 +30,8 @@ from backend.schemas import (
     CreateSessionRequest,
     ErrorDetail,
     ErrorResponse,
+    LLMSettingsPatch,
+    LLMSettingsView,
     ProfilePatchRequest,
     SessionSnapshot,
 )
@@ -198,6 +201,38 @@ def create_app(
     async def calendar(session_id: str) -> None:
         service.get_session(session_id)
         raise AppError("FEATURE_NOT_ENABLED", "日历导出尚未启用。", 501)
+
+    def llm_agent() -> LiteLLMAgent:
+        if not isinstance(runner, LiteLLMAgent):
+            raise AppError("FEATURE_NOT_ENABLED", "当前后端未使用可配置的模型。", 501)
+        return runner
+
+    def llm_view(agent: LiteLLMAgent) -> LLMSettingsView:
+        return LLMSettingsView(
+            configured=agent.settings.deepseek_api_key is not None,
+            model=agent.settings.llm_model,
+            available_models=list(LLM_MODELS),
+        )
+
+    @application.get(
+        "/api/settings/llm",
+        response_model=LLMSettingsView,
+        responses=_errors(501),
+    )
+    async def get_llm_settings() -> LLMSettingsView:
+        return llm_view(llm_agent())
+
+    # PATCH with a JSON body always needs a CORS preflight, so only configured
+    # origins can set the key from a browser.
+    @application.patch(
+        "/api/settings/llm",
+        response_model=LLMSettingsView,
+        responses=_errors(501),
+    )
+    async def patch_llm_settings(body: LLMSettingsPatch) -> LLMSettingsView:
+        agent = llm_agent()
+        agent.configure(body.api_key, body.model)
+        return llm_view(agent)
 
     @application.get(
         "/api/competitions/{instance_id}",

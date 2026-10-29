@@ -1,7 +1,7 @@
 // 行为对照 docs/frontend-contract.md 第 3–5 节和 backend/service.py；模型回答是固定脚本，不做真实分析
 import { ApiError } from '../client';
 import type {
-  AgentApi, CandidateCard, ChatParams, Message, Plan, PlanTask, SessionSnapshot, Stage, WeeklyLoad,
+  AgentApi, CandidateCard, ChatParams, LlmSettings, Message, Plan, PlanTask, SessionSnapshot, Stage, WeeklyLoad,
 } from '../types';
 import { CANDIDATES, COMPETITIONS, DIMENSIONS, DRAFT_PROFILE, EMPTY_PROFILE, TASK_SPECS } from './fixtures';
 import { addDays, clone, daysFromToday, delay, mondayOf } from './util';
@@ -17,6 +17,12 @@ type Store = Record<string, MockRecord>;
 
 const load = (): Store => JSON.parse(localStorage.getItem(STORE_KEY) ?? '{}') as Store;
 const save = (store: Store) => localStorage.setItem(STORE_KEY, JSON.stringify(store));
+
+const llmSettings: LlmSettings = {
+  configured: false,
+  model: 'deepseek/deepseek-chat',
+  available_models: ['deepseek/deepseek-chat', 'deepseek/deepseek-reasoner'],
+};
 
 const NEXT_STAGE: Record<Exclude<Stage, 'R4'>, Stage> = { R0: 'R1', R1: 'R2', R2: 'R4' };
 
@@ -293,5 +299,21 @@ export const mockAgentApi: AgentApi = {
     const c = COMPETITIONS.find((x) => x.competition_instance_id === id);
     if (!c) throw new ApiError('COMPETITION_NOT_FOUND', '竞赛不存在', 404);
     return clone(c);
+  },
+
+  async getLlmSettings() {
+    await delay(100);
+    return clone(llmSettings);
+  },
+
+  async patchLlmSettings(patch) {
+    await delay(100);
+    if (patch.model != null && !llmSettings.available_models.includes(patch.model)) {
+      invalid('请求字段无效，请检查后重试。');
+    }
+    // mock 只记录"已配置"，不保存 key 本身
+    if (patch.api_key) llmSettings.configured = true;
+    if (patch.model) llmSettings.model = patch.model;
+    return clone(llmSettings);
   },
 };

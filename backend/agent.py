@@ -14,7 +14,7 @@ from collections.abc import Awaitable, Callable
 from time import monotonic
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from backend.catalog import BEIJING, _applicable, _aware, assess_competition, check_eligibility
 from backend.config import Settings
@@ -421,10 +421,21 @@ class LiteLLMAgent:
         _silence_raw_sdk_logs()
         return await litellm.acompletion(**kwargs)
 
+    def configure(self, api_key: str | None, model: str | None) -> None:
+        """Swap in-memory credentials; the key is never written to disk."""
+        update: dict[str, Any] = {}
+        if api_key is not None:
+            update["deepseek_api_key"] = SecretStr(api_key)
+        if model is not None:
+            update["llm_model"] = model
+        self.settings = self.settings.model_copy(update=update)
+
     async def run(self, snapshot: SessionSnapshot, request: ChatRequest) -> AgentDraft:
-        if self.completion is None and self.settings.deepseek_api_key is None:
+        # One snapshot per run so a concurrent configure() cannot mix key and model.
+        settings = self.settings
+        if self.completion is None and settings.deepseek_api_key is None:
             raise _not_configured()
-        budget = _Budget(self.settings)
+        budget = _Budget(settings)
         state = snapshot.model_copy(deep=True)
         request = request.model_copy(deep=True)
         context = _Context(self.tools, state)
@@ -434,15 +445,15 @@ class LiteLLMAgent:
         while True:
             timeout = budget.model_timeout()
             kwargs = {
-                "model": self.settings.llm_model,
+                "model": settings.llm_model,
                 "messages": copy.deepcopy(messages),
                 "timeout": timeout,
-                "max_tokens": self.settings.llm_max_output_tokens,
+                "max_tokens": settings.llm_max_output_tokens,
                 "num_retries": 0,
             }
-            if self.settings.deepseek_api_key is not None:
-                kwargs["api_key"] = self.settings.deepseek_api_key.get_secret_value()
-            active_tools = definitions if budget.tools < self.settings.max_tool_calls else []
+            if settings.deepseek_api_key is not None:
+                kwargs["api_key"] = settings.deepseek_api_key.get_secret_value()
+            active_tools = definitions if budget.tools < settings.max_tool_calls else []
             if active_tools:
                 # Tool discovery and JSON-object mode need not coexist at the provider.
                 kwargs.update(tools=copy.deepcopy(active_tools), tool_choice="auto")
@@ -464,7 +475,7 @@ class LiteLLMAgent:
                     raise _invalid()
                 validated = self._calls(calls, active_tools, seen_calls)
                 # Reserve the ENTIRE batch before touching even the first tool.
-                if len(validated) > self.settings.max_tool_calls - budget.tools:
+                if len(validated) > settings.max_tool_calls - budget.tools:
                     raise _invalid()
                 budget.tools += len(validated)
                 messages.append(

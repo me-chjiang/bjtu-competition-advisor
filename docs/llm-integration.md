@@ -8,7 +8,7 @@
 
 | 配置项 | 来源与默认建议 |
 |---|---|
-| `DEEPSEEK_API_KEY` | LiteLLM 官方 DeepSeek provider 读取的环境变量，必需；安全注入，不写进前端 |
+| `DEEPSEEK_API_KEY` | LiteLLM 官方 DeepSeek provider 读取的环境变量，必需；环境注入，或在网页「模型设置」经 `PATCH /api/settings/llm` 写入后端内存（不落盘、不回显） |
 | `LLM_MODEL` | 默认 `deepseek/deepseek-chat`，带 `deepseek/` provider 前缀 |
 | `LLM_TIMEOUT_SECONDS` | 默认 30 秒；实际单次不超过 30 秒及整请求剩余时间 |
 | `LLM_MAX_OUTPUT_TOKENS` | 默认/上限 4096，真实 provider 参数支持仍待验证 |

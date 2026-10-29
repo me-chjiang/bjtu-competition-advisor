@@ -6,10 +6,12 @@ import { CANDIDATES, DIMENSIONS, DRAFT_PROFILE } from '../api/mock/fixtures';
 import type { CandidateCard, LoginForm, Plan, SessionSnapshot } from '../api/types';
 import CandidateList from '../components/CandidateList.vue';
 import DynamicForm from '../components/DynamicForm.vue';
+import LlmSettingsDialog from '../components/LlmSettingsDialog.vue';
 import ProfilePanel from '../components/ProfilePanel.vue';
 import RoutePlan from '../components/RoutePlan.vue';
 import ScorecardList from '../components/ScorecardList.vue';
 import StageBar from '../components/StageBar.vue';
+import { llmDialogOpen } from '../llm-dialog';
 import AdvisorView from '../views/AdvisorView.vue';
 
 const api = vi.hoisted(() => ({
@@ -20,6 +22,8 @@ const api = vi.hoisted(() => ({
   patchCandidate: vi.fn(),
   confirm: vi.fn(),
   getCompetition: vi.fn(),
+  getLlmSettings: vi.fn(),
+  patchLlmSettings: vi.fn(),
 }));
 vi.mock('../api', () => ({ agentApi: api, apiModes: { mis: 'mock', agent: 'mock' } }));
 
@@ -292,6 +296,51 @@ describe('ProfilePanel', () => {
   });
 });
 
+describe('LlmSettingsDialog', () => {
+  const view = (configured: boolean) => ({
+    configured,
+    model: 'deepseek/deepseek-chat',
+    available_models: ['deepseek/deepseek-chat', 'deepseek/deepseek-reasoner'],
+  });
+
+  beforeEach(() => {
+    Object.values(api).forEach((fn) => fn.mockReset());
+    localStorage.clear();
+  });
+
+  it('key 只发给后端：保存后清空输入，不写 localStorage，页面不回显', async () => {
+    api.getLlmSettings.mockResolvedValue(view(false));
+    api.patchLlmSettings.mockResolvedValue({ ...view(true), model: 'deepseek/deepseek-reasoner' });
+    const w = mount(LlmSettingsDialog);
+    await flushPromises();
+    expect(w.text()).toContain('尚未配置');
+    await w.find('select[name="model"]').setValue('deepseek/deepseek-reasoner');
+    await w.find('input[name="api_key"]').setValue('  sk-secret-1  ');
+    expect(w.find('input[name="api_key"]').attributes('type')).toBe('password');
+    await w.find('form').trigger('submit');
+    await flushPromises();
+    expect(api.patchLlmSettings).toHaveBeenCalledWith({ api_key: 'sk-secret-1', model: 'deepseek/deepseek-reasoner' });
+    expect((w.find('input[name="api_key"]').element as HTMLInputElement).value).toBe('');
+    expect(w.html()).not.toContain('sk-secret-1');
+    expect(JSON.stringify(localStorage)).not.toContain('sk-secret-1');
+    expect(w.text()).toContain('已配置');
+  });
+
+  it('已配置时留空 key 只改模型；什么都没改不发请求', async () => {
+    api.getLlmSettings.mockResolvedValue(view(true));
+    api.patchLlmSettings.mockResolvedValue({ ...view(true), model: 'deepseek/deepseek-reasoner' });
+    const w = mount(LlmSettingsDialog);
+    await flushPromises();
+    await w.find('form').trigger('submit');
+    await flushPromises();
+    expect(api.patchLlmSettings).not.toHaveBeenCalled();
+    await w.find('select[name="model"]').setValue('deepseek/deepseek-reasoner');
+    await w.find('form').trigger('submit');
+    await flushPromises();
+    expect(api.patchLlmSettings).toHaveBeenCalledWith({ model: 'deepseek/deepseek-reasoner' });
+  });
+});
+
 describe('AdvisorView', () => {
   const mountView = async () => {
     const router = createRouter({
@@ -311,6 +360,19 @@ describe('AdvisorView', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it('模型未配置时在错误提示里给出「去配置模型」入口', async () => {
+    llmDialogOpen.value = false;
+    api.getSession.mockResolvedValue(snap({ status: 'collecting', needs_confirmation: false, cards: [] }));
+    api.chat.mockRejectedValue(new ApiError('LLM_NOT_CONFIGURED', '模型尚未配置或凭据不可用。', 503));
+    const w = await mountView();
+    await generateButton(w).trigger('click');
+    await flushPromises();
+    const link = w.findAll('button').find((b) => b.text() === '去配置模型');
+    expect(link).toBeDefined();
+    await link!.trigger('click');
+    expect(llmDialogOpen.value).toBe(true);
   });
 
   it('双击「确认本阶段」只发出一个请求，期间按钮禁用', async () => {

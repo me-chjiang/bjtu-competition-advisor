@@ -58,7 +58,7 @@ export BJTU_ALLOWED_ORIGINS=http://localhost:5173
 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
-无 key 时可创建、读取、编辑会话以及查询竞赛；chat 返回 `503 LLM_NOT_CONFIGURED`。需要真实模型时，先明确费用授权，再通过进程管理器/安全环境注入 `DEEPSEEK_API_KEY`，重启服务；不要把 key 写进命令历史、聊天或文档。模型能力仍需用虚构画像单独联网验收，安装成功不等于 provider 支持工具/JSON 参数。
+无 key 时可创建、读取、编辑会话以及查询竞赛；chat 返回 `503 LLM_NOT_CONFIGURED`。需要真实模型时，先明确费用授权，再通过进程管理器/安全环境注入 `DEEPSEEK_API_KEY` 并重启服务，或在前端页头「模型设置」填写 key 和模型（只存后端内存，重启后需重填）；不要把 key 写进命令历史、聊天或文档。模型能力仍需用虚构画像单独联网验收，安装成功不等于 provider 支持工具/JSON 参数。
 
 如确需私有 YAML，使用自己的启动模块显式调用 `Settings.from_sources(os.environ, Path("lexmount-config.yaml"))`，再交给 `create_app(settings)`；环境优先。可读键为 `deepseek-api-key`、`llm-model`、`llm-timeout-seconds`、`llm-max-output-tokens`、`bjtu-data-dir`、`bjtu-catalog-path`、`bjtu-allowed-origins`，其他 Lexmount/MIS 凭据不会保留到 Settings。不要修改或提交真实配置。
 

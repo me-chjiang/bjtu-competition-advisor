@@ -12,6 +12,7 @@ import RoutePlan from '../components/RoutePlan.vue';
 import ScorecardList from '../components/ScorecardList.vue';
 import StageBar from '../components/StageBar.vue';
 import { errorMessage } from '../errors';
+import { llmDialogOpen } from '../llm-dialog';
 
 type Tab = 'screen' | 'review' | 'route';
 
@@ -25,6 +26,7 @@ const loading = ref(false);
 const busy = ref(false);
 const error = ref<string | null>(null);
 const notice = ref<string | null>(null);
+const needsLlm = ref(false);
 const notFound = ref(false);
 const pendingText = ref<string | null>(null);
 const userTab = ref<Tab | null>(null);
@@ -177,6 +179,7 @@ async function recover(e: unknown, isChat: boolean) {
       }
     } else {
       error.value = errorMessage(e);
+      needsLlm.value = e.code === 'LLM_NOT_CONFIGURED';
       if (e.code === 'SESSION_NOT_FOUND') notFound.value = true;
     }
   } catch (refreshError) {
@@ -189,6 +192,7 @@ async function mutate(run: (s: SessionSnapshot) => Promise<SessionSnapshot>, isC
   if (!s || locked.value) return;
   busy.value = true;
   error.value = null;
+  needsLlm.value = false;
   notice.value = null;
   try {
     accept(await run(s));
@@ -236,7 +240,9 @@ const open = (competitionId: string, highlight: string[]) => {
   <div v-else-if="snapshot" class="advisor">
     <StageBar :stage="snapshot.stage" :status="snapshot.status" :message="snapshot.message" />
     <div v-if="error" class="alert error" role="alert">
-      {{ error }} <button class="link" type="button" @click="error = null">知道了</button>
+      {{ error }}
+      <button v-if="needsLlm" class="link" type="button" @click="llmDialogOpen = true">去配置模型</button>
+      <button class="link" type="button" @click="error = null">知道了</button>
     </div>
     <div v-if="notice" class="alert info" role="status">{{ notice }}</div>
 

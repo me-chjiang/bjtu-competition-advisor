@@ -581,3 +581,52 @@ async def test_corrupt_file_returns_safe_error_without_replacement(client, setti
         assert "fictional-secret" not in response.text
         assert "do-not-echo" not in response.text
     assert path.read_bytes() == previous
+
+
+async def test_llm_settings_hold_key_in_memory_without_echo(client, settings):
+    initial = await client.get("/api/settings/llm")
+    assert initial.status_code == 200
+    assert initial.json() == {
+        "configured": False,
+        "model": "deepseek/deepseek-chat",
+        "available_models": ["deepseek/deepseek-chat", "deepseek/deepseek-reasoner"],
+    }
+
+    secret = "sk-test-not-a-real-key-123"
+    updated = await client.patch(
+        "/api/settings/llm", json={"api_key": secret, "model": "deepseek/deepseek-reasoner"}
+    )
+    assert updated.status_code == 200
+    assert updated.json()["configured"] is True
+    assert updated.json()["model"] == "deepseek/deepseek-reasoner"
+    assert secret not in updated.text
+
+    reloaded = await client.get("/api/settings/llm")
+    assert reloaded.json()["configured"] is True
+    assert secret not in reloaded.text
+    assert not settings.data_dir.exists()
+
+
+async def test_llm_settings_reject_unlisted_model_without_echo(client):
+    secret = "sk-test-not-a-real-key-456"
+    response = await client.patch(
+        "/api/settings/llm", json={"api_key": secret, "model": "openai/gpt-x"}
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert secret not in response.text
+    assert (await client.get("/api/settings/llm")).json()["configured"] is False
+
+
+async def test_llm_settings_unavailable_for_injected_agent(settings):
+    class Fixed:
+        async def run(self, snapshot, request):
+            raise AssertionError("not called")
+
+    app = create_app(settings, agent=Fixed())
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get("/api/settings/llm")
+    assert response.status_code == 501
+    assert response.json()["error"]["code"] == "FEATURE_NOT_ENABLED"

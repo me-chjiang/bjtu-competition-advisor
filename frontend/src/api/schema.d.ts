@@ -123,6 +123,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/llm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Llm Settings */
+        get: operations["get_llm_settings_api_settings_llm_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Llm Settings */
+        patch: operations["patch_llm_settings_api_settings_llm_patch"];
+        trace?: never;
+    };
     "/api/competitions/{instance_id}": {
         parameters: {
             query?: never;
@@ -305,6 +323,25 @@ export interface components {
             applicable_year?: number | null;
             /** Scope */
             scope?: string | null;
+        };
+        /** LLMSettingsPatch */
+        LLMSettingsPatch: {
+            /** Api Key */
+            api_key?: string | null;
+            /** Model */
+            model?: ("deepseek/deepseek-chat" | "deepseek/deepseek-reasoner") | null;
+        };
+        /**
+         * LLMSettingsView
+         * @description Never carries the key itself, only whether one is held in memory.
+         */
+        LLMSettingsView: {
+            /** Configured */
+            configured: boolean;
+            /** Model */
+            model: string;
+            /** Available Models */
+            available_models: string[];
         };
         /** Message */
         Message: {
@@ -915,6 +952,104 @@ export interface operations {
                 };
             };
             /** @description Successful Response */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_llm_settings_api_settings_llm_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMSettingsView"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    patch_llm_settings_api_settings_llm_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LLMSettingsPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMSettingsView"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Implemented */
             501: {
                 headers: {
                     [name: string]: unknown;

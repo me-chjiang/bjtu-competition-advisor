@@ -61,6 +61,8 @@ export type Plan = Omit<Req<Schemas['Plan']>, 'tasks' | 'weekly_load'> & {
 export type Message = Schemas['Message'];
 export type CompetitionDetail = Omit<Req<Schemas['CompetitionDetail']>, 'evidence'> & { evidence: Evidence[] };
 export type ErrorResponse = Schemas['ErrorResponse'];
+export type LlmSettings = Schemas['LLMSettingsView'];
+export type LlmSettingsPatch = Schemas['LLMSettingsPatch'];
 export type SessionSnapshot = Omit<Req<Schemas['SessionSnapshot']>, 'profile' | 'cards' | 'plan'> & {
   profile: Profile;
   cards: CandidateCard[];
@@ -107,4 +109,7 @@ export interface AgentApi {
   patchCandidate(id: string, candidateId: string, expectedRevision: number, decision: Decision): Promise<SessionSnapshot>;
   confirm(id: string, expectedRevision: number, stage: Stage): Promise<SessionSnapshot>;
   getCompetition(id: string): Promise<CompetitionDetail>;
+  getLlmSettings(): Promise<LlmSettings>;
+  // key 只发给本机后端内存，前端不保存
+  patchLlmSettings(patch: LlmSettingsPatch): Promise<LlmSettings>;
 }
