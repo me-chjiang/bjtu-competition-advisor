@@ -4,8 +4,25 @@
 
 ## 1. MIS 登录：弹窗登录延迟过高，改为本地前端代填
 
-- 状态：待实现
+- 状态：旧登录流程已实现（2026-10-15）；2026-10-20 发现新 SSO 页面，适配待排查；隧道开关未做
 - 记录日期：2026-10-15
+- 2026-10-20 更新（来源：Lexmount 页面探测及用户错误反馈，AI 辅助整理）：
+  - 本次 MIS 入口跳转到 `sso.bjtu.edu.cn/o/authorize/`；可见表单位于 `iframe#loginIframe`，主 frame 的同名输入框隐藏。探测到 iframe 内 `input[name=username]`、`input[name=password]` 和 `a.login-btn`。
+  - 页面接入腾讯验证码 frame，但提交后的挑战类型尚未实测，不能认定仍使用旧版算术验证码。
+  - `lexmount-fetch` 加入 iframe 定位后，用户运行仍在填写阶段报 `locator.fill: Timeout 15000ms exceeded.`，停在上述 SSO 地址。尚未提交登录，超时根因未确定。
+  - 待排查：实际 frame 层级及加载时序、输入框定位、登录成功判定、教务系统 SSO 和 context 复用；`backend/collector.py` 的旧 CAS 假设需重新核验。
+  - 详细记录与历史流程区分见 `教务系统/login-and-competition-guide.md`「2026-10-20 更新」。本次仅记问题，不重试登录或修改业务代码。
+- 实现：`backend/collector.py`（登录、采集）+ `frontend/` 登录页和等待页；接口见 `docs/api-contract.md`。
+- 待定问题的结论：
+  - 验证码：后端截图后显示在前端。
+  - 凭据：不落盘；登录态靠持久化 context 保存。
+  - 登录失败：显示 CAS 原文，后端不自动重试，每次登录最多 3 次。
+  - 录制：登录会话不录制，采集会话录制。
+- 实测发现（2026-10-15）：
+  - 持久化 context 只保住了 CAS 登录态，教务系统会话需要重新单点登录，采集前会自动完成；
+  - `read_write` 会话刚关闭时，context 要保存几秒，期间建会话会报 not found，已加退避重试；
+  - Lexmount 服务端尚未实现 `read_only` context。
+- 首次真实采集结果：竞赛项目 724 条（2025、2026 两个年度，379 个项目编号，221 个竞赛系列），可报名轮次 43 条。
 
 ### 现状
 
@@ -51,7 +68,7 @@
 
 ## 2. 先划定 MVP（最小可用版本）
 
-- 状态：待讨论
+- 状态：第二轮方案已有 MVP 草案（2026-10-16），见 `REQUIREMENTS.md`「第二轮 / MVP」；下方 10-15 的起点建议已被取代
 - 记录日期：2026-10-15
 - 问题：方案里的 R0–R4、多 Agent 讨论、实时补全等功能太多，10-24 前全部做完风险很高。需要先确定 MVP 必须包含什么，其余功能按优先级往后排。
 - 起点建议（待讨论）：
@@ -65,7 +82,7 @@
 
 ## 3. 确定项目的量化标准
 
-- 状态：待讨论
+- 状态：已有指标草案（2026-10-16），见 `REQUIREMENTS.md`「第二轮 / 验收指标」，目标值待定
 - 记录日期：2026-10-15
 - 问题：评分标准里的「结果有价值」和「过程可信」需要可量化的指标。指标和目标值都要先定下来，再据此设计评测。
 - 候选指标（目标值待定）：
@@ -90,7 +107,9 @@
 
 ## 5. 最终方案的形式：只给一套组合是否太少
 
-- 状态：待讨论
+- 状态：已定
+  - 10-15：采用 Top-N 排序列表加多选路线，前端已实现；
+  - 10-16：输出扩展为「方向行情报告 + 单项调研卡片 + 优化后的参赛方案」。
 - 记录日期：2026-10-15
 - 问题：现方案是 R3 产出 2–3 套组合，用户选定其中一套，R4 只针对这一套出方案。最终只拿到一套组合，信息可能太少。
 - 备选：
@@ -98,6 +117,18 @@
   - 「稳妥 / 冲刺 / 探索」组合作为排序列表之上的推荐视图，而不是唯一的输出。
   - R4 的备赛路线和时间线可以覆盖用户勾选的多项竞赛，并检查它们之间的时间冲突。
 - 待定：与 issue 2 一起决定 MVP 采用哪种形式。
+
+## 6. 官方 Lexmount Skill 在 Linux 上不可用，与 AGENTS.md 的接入路线不符
+
+- 状态：待讨论
+- 记录日期：2026-10-20
+- 来源：子代理阅读官方仓库源码和文档，主会话核对了 `bootstrap.sh` 和 `doctor.sh`；AI 辅助整理。未安装或运行官方 CLI。
+- 问题：`AGENTS.md` 写的是「Linux x64 首选原生 MCP / CLI + Skill」。但官方 Rust 版 `browser-cli-rs` 的 skill 脚本只放行 `Darwin-arm64`（Windows 走 ps1），在 Linux 上直接报 `unsupported_platform`。Release 里虽然有 Linux 二进制，skill 却用不了。
+- 可选方向：
+  - Intel Mac 和 Linux 试官方 Python 版 `browser-cli`（`uv tool install`，未验证）；
+  - 或者用本项目抽出的通用 skill `lexmount-fetch`（独立仓库 https://github.com/me-chjiang/lexmount-skill-universal ，本项目 `.claude/skills/lexmount-fetch/` 是副本）。
+- 官方 skill 与 `lexmount-fetch` 的功能对比，见独立仓库的 `docs/official-skill-comparison.md`。
+- 本次没有修改 `AGENTS.md`。
 
 ## 其他待跟进
 

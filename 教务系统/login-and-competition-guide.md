@@ -14,7 +14,22 @@
 
 ## 1. 登录
 
-### 结论：必须走 MIS 统一身份认证（CAS），不要用教务系统自带登录页
+### 2026-10-20 更新：新 SSO 登录页，适配尚未完成
+
+来源：本会话 Lexmount 云浏览器页面结构探测、截图及用户运行 `lexmount-fetch` 的错误反馈；AI 辅助整理。
+
+- 本次访问 `https://mis.bjtu.edu.cn/` 跳转到 `https://sso.bjtu.edu.cn/o/authorize/`，不是此前的 `cas.bjtu.edu.cn/auth/login/`。这只是本次观测，不代表旧入口已全面停用。
+- 顶层页面仍有隐藏的 `form#loginForm` 和 `input[name=username]` / `input[name=password]`，直接在主 frame 定位会命中隐藏表单。
+- 可见登录界面位于 `iframe#loginIframe`（入口路径 `/page/common.html`）；探测到可见输入框 `input[name=username]`、`input[name=password]`，按钮为 `a.login-btn`。页面还提供扫码和短信登录。
+- 检测到 `turing.captcha.gtimg.com` frame，说明页面接入腾讯验证码；**尚未验证提交后是否出现滑块及其具体流程**，不能继续沿用旧版算术验证码的假设。
+- 加入 iframe 定位后，用户运行仍报：`profile bjtu-mis 未能填写登录表单（locator.fill: Timeout 15000ms exceeded.）`，停在 `sso.bjtu.edu.cn/o/authorize/`。**新选择器尚未验证可用，超时根因未确定**，不能只归因于隐藏表单。
+- 本次错误发生在填写阶段，尚未执行登录提交；不据此判断密码错误或账号被锁。登录成功、持久化登录态复用及进入教务系统的单点登录均未验证。
+- 用户提供的本地诊断截图：`~/.local/state/lexmount-fetch/login-failed-bjtu-mis.png`。本次记录未重新检查该截图，不保证其中不含个人信息；不要提交或对外分享。
+- `backend/collector.py` 的旧 CAS 路径判断、主 frame 表单操作和验证码处理需要重新核验。本次仅记录，未修改后端或重试登录。
+
+### 历史实测（2026-10-13）：走 MIS 统一认证（CAS），不要用教务系统自带登录页
+
+以下表格、步骤及代码是旧页面的成功记录，不是新版 SSO 已验证的操作指南。
 
 | 入口 | URL | 结果 |
 |---|---|---|

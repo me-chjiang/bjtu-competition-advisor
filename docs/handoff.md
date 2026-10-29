@@ -1,8 +1,27 @@
-# 交接：进度与待办（2026-10-15）
+# 交接：进度与待办（2026-10-16 更新）
 
 > AI 辅助生成（Claude Code / OpenCode），根据截至 10-15 的工作记录和用户讨论整理；后端方向已更新，相关功能尚未实现。
 
 截止：2026-10-25 23:59（北京时间），计划 10-24 提交。方案见 `docs/plan.md`，原定 10-14 的决策门槛目前只完成了一部分。
+
+## 10-16 更新（优先阅读）
+
+- **方向调整**：核心从「MIS 采集 + 推荐」转为「公开网络上的竞赛行情调研 + 参赛方案优化」，MIS 降为可选。
+  - 详见 `docs/plan.md`「方向调整（2026-10-16）」、根目录 `REQUIREMENTS.md` 和 `PLAN.md` 的「第二轮」。
+  - 有 5 项待拍板，拍板前不开工。
+- **第一轮已交付**（loop-dev-cycle，进度见 `CYCLE_STATE.md`）：
+  - `frontend/`：Vue 3 + Vite + TS。
+    - 登录页、等待页，以及 R0→R1→R2→R4 的 Agent 页（mock 模式）；
+    - MIS 和 Agent 各有一个开关，可以分别在 mock 和真实后端之间切换。
+    - 已在 `frontend` 分支提交。
+  - `backend/`：FastAPI + Lexmount Python SDK。
+    - `/mis/*` 负责代填登录和列表采集，用户本人登录后实测成功；
+    - 29 个测试通过。
+  - `docs/api-contract.md`：前后端接口契约。Agent 部分待用户确认，并且需要按第二轮调整，例如补上 S 类、新增 `/research` 和 `/directions` 接口。
+- **运行方式**
+  - 后端：`cd backend && uv run uvicorn main:app --host 127.0.0.1 --port 8000`
+  - 前端：`cd frontend && npm ci && npm run dev`
+  - 默认使用 mock；要接真实 MIS 时，前面加上 `VITE_MIS_API=real`。
 
 ## 已完成 / 已验证
 
@@ -22,8 +41,8 @@
 
 ### A：采集与云端
 - [ ] 在 Linux 上验证 Lexmount 原生 MCP / CLI + Skill 的接入（首选路线），记录接入步骤。SDK + Playwright 只作为不兼容设备的备选。
-- [ ] **`issue.md` #1**（备选路线）：去掉 `inspectUrl` 弹窗登录（延迟太高），改为「本地前端输入账号 → 后端用 Lexmount 登录」。隧道改为可选开关。
-- [ ] `collect/mis.mjs` 端到端跑通 1 页，再全量采集约 700 条及详情页；去重。
+- [x] **`issue.md` #1**（备选路线，10-15 已实现）：去掉 `inspectUrl` 弹窗登录（延迟太高），改为「本地前端输入账号 → 后端用 Lexmount 登录」。隧道改为可选开关。
+- [x] 列表全量采集已由 `backend/collector.py` 完成（10-15：竞赛项目 724 条，可报名轮次 43 条）；详情页和 Node 脚本 `collect/mis.mjs` 未跑。
   - 代码已写好，但没有成功跑过。
   - 采集对象是「竞赛项目」页 `/innovation/cpitem/`；这个页面是否支持 `perpage` 参数还没验证（「竞赛报名」页支持）。
 - [ ] `enrich/fetch.mjs`：分层抓取，先用 WebFetch，失败再用云浏览器；用必应搜索补全竞赛官网和章程。WebFetch 的接口和额度待确认。
