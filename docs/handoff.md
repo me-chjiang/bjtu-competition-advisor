@@ -70,6 +70,15 @@
   - 请 3–5 位同学试用。
 - [ ] 提交材料：脱敏日志、session 回放、抽检表、2–3 分钟录屏。
 
+## 10-29 前端对接决定
+
+- 契约以后端为准：`docs/frontend-contract.md` + `/openapi.json`；`docs/api-contract.md` 的 Agent 部分作废。
+- MIS 登录/等待页下线路由，`/` 直接进 `/advisor`；页面代码保留，`/mis/*` 移植另排期。
+- 前端 TS 类型用 `openapi-typescript` 从 `/openapi.json` 生成（`npm run gen:api`）。
+- 范围：先让 R0→R1→R2→R4 接通真实后端，第二轮（方向报告、调研卡片、现场调研）随后做。
+- 连接：Vite 代理 `/api` → `127.0.0.1:8000`；单开关 `VITE_AGENT_API=real|mock`。
+- 联调目录：用 Lexmount 抓取算法编程 + 数学建模约 8–10 个竞赛，整理为 `data/competitions.json`（git-ignored），需人工审核。
+
 ## 待决事项（需要团队拍板）
 
 1. 验证码怎么处理：建议后端截图显示在前端，用户输入后一起提交（见 `issue.md` #1）。

@@ -1,5 +1,7 @@
 # 前后端 HTTP 接口契约（草案）
 
+> **2026-10-29 起已被取代**：Agent 部分以 `docs/frontend-contract.md` 和后端 `/openapi.json` 为准；`/mis/*` 随旧后端删除，本文 MIS 部分仅作移植参考。
+
 > AI 辅助生成（Claude Code），基于 `docs/plan.md` §5、§7 起草，2026-10-15。
 > - MIS 部分由 `backend/` 实现。
 > - Agent 部分（`/sessions`、`/competitions`）待用户确认后按此实现；前端 mock（`frontend/src/api/mock/`）是它的参考实现。
