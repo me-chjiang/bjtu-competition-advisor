@@ -60,6 +60,7 @@ async def test_create_and_reload_session(client, settings):
         "team_preference": None,
         "unavailable_dates": [],
         "additional_context": None,
+        "summary": None,
     }
     assert len(created["session_id"]) == 32
     async with httpx.AsyncClient(

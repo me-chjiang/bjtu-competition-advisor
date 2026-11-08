@@ -187,22 +187,6 @@ async def test_model_cannot_write_server_fields(registry, field, value):
     assert len(script.calls) == 1
 
 
-async def test_context_conflict_requests_review(registry):
-    state = snapshot(profile=Profile(weekly_hours=6, additional_context="现在可能只有两小时"))
-    original = state.model_copy(deep=True)
-    script = Script(
-        response(
-            {"kind": "profile", "message": "已改为两小时。", "profile_changes": {"weekly_hours": 2}}
-        )
-    )
-    draft = await LiteLLMAgent(Settings(), registry, script).run(state, request(None))
-    assert draft.kind == "question"
-    assert draft.profile_changes is None
-    assert "核对" in draft.message
-    assert state == original
-    assert state.profile.weekly_hours == 6
-
-
 async def test_context_is_bounded_and_untrusted(registry):
     history = [
         Message(
@@ -550,16 +534,6 @@ async def test_deeply_nested_output_is_controlled(registry):
     await assert_invalid(LiteLLMAgent(Settings(), registry, script))
 
 
-async def test_unsubstantiated_profile_change_is_a_review_question(registry):
-    script = Script(
-        response(
-            {"kind": "profile", "message": "每周六小时。", "profile_changes": {"weekly_hours": 6}}
-        )
-    )
-    draft = await LiteLLMAgent(Settings(), registry, script).run(snapshot(), request("继续吧"))
-    assert draft.kind == "question" and draft.profile_changes is None
-
-
 async def test_explicit_profile_changes_preserve_unset_fields(registry):
     state = snapshot(profile=Profile(major="计算机", weekly_hours=None))
     script = Script(
@@ -569,6 +543,37 @@ async def test_explicit_profile_changes_preserve_unset_fields(registry):
     assert draft.kind == "profile"
     assert draft.profile_changes.model_dump(exclude_unset=True) == {"weekly_hours": 6}
     assert state.profile.weekly_hours is None and state.profile.major == "计算机"
+
+
+async def test_free_form_resume_is_organized_into_profile_draft(registry):
+    resume = (
+        "这是一份虚构的个人资料。目前就读于示例大学计算机科学与技术专业，是一名大一学生。"
+        "熟悉 Python，曾使用 PyTorch 完成低光图像重建项目。"
+    )
+    changes = {
+        "grade": "大一",
+        "major": "计算机科学与技术",
+        "skills": [{"name": "Python", "evidence": "用 PyTorch 完成低光图像重建项目"}],
+        "summary": "## 基本情况\n- 大一，计算机科学与技术\n\n## 技能\n- **Python**：图像重建项目",
+    }
+    script = Script(
+        response({"kind": "profile", "message": "已整理画像。", "profile_changes": changes})
+    )
+    draft = await LiteLLMAgent(Settings(), registry, script).run(snapshot(), request(resume))
+    assert draft.kind == "profile"
+    assert draft.profile_changes.model_dump(mode="json", exclude_unset=True) == changes
+
+
+async def test_correction_replaces_confirmed_value_without_fixed_phrasing(registry):
+    state = snapshot(profile=Profile(grade="大三", major="计算机"))
+    script = Script(
+        response({"kind": "profile", "message": "已更正。", "profile_changes": {"grade": "大二"}})
+    )
+    draft = await LiteLLMAgent(Settings(), registry, script).run(
+        state, request("搞错了，其实我读大二")
+    )
+    assert draft.kind == "profile"
+    assert draft.profile_changes.grade == "大二"
 
 
 async def test_context_uses_reassessed_catalog_and_preserves_decisions(registry):
@@ -1014,57 +1019,6 @@ async def test_review_i2_explicit_correction_is_not_locked_by_context(registry, 
     assert state == original
 
 
-async def test_review_i2_ambiguous_change_names_field_and_confirmation_resolves_it(registry):
-    state = snapshot(profile=Profile(weekly_hours=6, additional_context="偏好算法竞赛"))
-    proposed = {"kind": "profile", "message": "请核对。", "profile_changes": {"weekly_hours": 2}}
-    script = Script(response(proposed), response(proposed))
-    agent = LiteLLMAgent(Settings(), registry, script)
-    draft = await agent.run(state, request("也许每周两小时，但我还不确定"))
-    assert draft.kind == "question" and draft.profile_changes is None
-    assert "每周" in draft.message and "6" in draft.message and "2" in draft.message
-    confirmed = await agent.run(state, request("我确认是每周两小时，请更正"))
-    assert confirmed.kind == "profile" and confirmed.profile_changes.weekly_hours == 2
-
-
-@pytest.mark.parametrize(
-    "field,value,text",
-    [
-        ("weekly_hours", 8, "每周6小时，每周8小时。"),
-        ("grade", "大三", "我是大二，我是大三。"),
-        ("major", "金融", "我的专业是计算机，我的专业是金融。"),
-        ("grade", "大三", "我可能是大三。"),
-        ("major", "金融", "专业也许是金融。"),
-        ("weekly_hours", 8, "每周可能8小时。"),
-        ("grade", "大三", "不是大三，我是大三。"),
-        ("major", "金融", "不要改成金融，请更正专业为金融。"),
-        ("weekly_hours", 8, "每周不能投入8小时，每周能投入8小时。"),
-        ("grade", "大三", "朋友是大三。"),
-        ("major", "金融", "我想参加金融竞赛。"),
-        ("weekly_hours", 6, "每周6小时，每周也能8小时。"),
-        ("grade", "大三", "我是大三，我目前大二。"),
-        ("major", "金融", "我的专业是金融，我专业计算机。"),
-        ("weekly_hours", 8, "每周8小时，也许每周6小时。"),
-        ("grade", "大三", "我是大三，也许我是大二。"),
-        ("major", "金融", "我的专业是金融，也许专业是计算机。"),
-    ],
-)
-async def test_final_i1_conflicting_uncertain_or_unattributed_scalar_gets_review(
-    registry, field, value, text
-):
-    script = Script(
-        response(
-            {
-                "kind": "profile",
-                "message": "错误提取",
-                "profile_changes": {field: value},
-            }
-        )
-    )
-    draft = await LiteLLMAgent(Settings(), registry, script).run(snapshot(), request(text))
-    assert draft.kind == "question" and draft.profile_changes is None
-    assert "核对" in draft.message
-
-
 async def test_final_i1_affirmative_scalar_and_not_teaming_are_independent(registry):
     script = Script(
         response(
@@ -1084,27 +1038,6 @@ async def test_final_i1_affirmative_scalar_and_not_teaming_are_independent(regis
     assert draft.profile_changes.team_preference == "solo"
 
 
-@pytest.mark.parametrize("existing", [[], [{"name": "Python", "evidence": "课程项目"}]])
-async def test_review_i3_name_alone_cannot_authorize_invented_evidence(registry, existing):
-    state = snapshot(profile=Profile(skills=existing))
-    script = Script(
-        response(
-            {
-                "kind": "profile",
-                "message": "技能草案。",
-                "profile_changes": {
-                    "skills": [
-                        {"name": "Python", "evidence": "取得全国一等奖（虚构，用户未提供）"}
-                    ],
-                },
-            }
-        )
-    )
-    draft = await LiteLLMAgent(Settings(), registry, script).run(state, request("我学过Python"))
-    assert draft.kind == "question" and draft.profile_changes is None
-    assert "Python" in draft.message and "依据" in draft.message
-
-
 async def test_review_i3_preserve_old_skill_and_add_supported_new_skill(registry):
     old = {"name": "Python", "evidence": "课程项目"}
     new = {"name": "Java", "evidence": "完成Java课程项目"}
@@ -1120,45 +1053,6 @@ async def test_review_i3_preserve_old_skill_and_add_supported_new_skill(registry
     assert draft.kind == "profile"
     assert draft.profile_changes.model_dump(exclude_unset=True)["skills"] == [old, new]
     assert state.profile.skills[0].evidence == "课程项目" and len(state.profile.skills) == 1
-
-
-async def test_review_i3_removal_needs_specific_user_basis_and_can_be_confirmed(registry):
-    state = snapshot(profile=Profile(skills=[{"name": "Python", "evidence": "课程项目"}]))
-    proposed = {
-        "kind": "profile",
-        "message": "技能草案。",
-        "profile_changes": {
-            "skills": [{"name": "Java", "evidence": None}],
-        },
-    }
-    script = Script(response(proposed), response(proposed))
-    agent = LiteLLMAgent(Settings(), registry, script)
-    draft = await agent.run(state, request("我还会Java，请保留已有技能"))
-    assert draft.kind == "question" and draft.profile_changes is None
-    assert "Python" in draft.message and "删除" in draft.message
-    confirmed = await agent.run(state, request("我确认删除Python，只保留Java"))
-    assert confirmed.kind == "profile"
-    assert [item.name for item in confirmed.profile_changes.skills] == ["Java"]
-
-
-@pytest.mark.parametrize("negative", ["不要删除Python", "不删除Python", "不能删除Python"])
-async def test_review_i3_do_not_delete_is_not_removal_authority(registry, negative):
-    state = snapshot(profile=Profile(skills=[{"name": "Python", "evidence": None}]))
-    script = Script(
-        response(
-            {
-                "kind": "profile",
-                "message": "技能草案。",
-                "profile_changes": {
-                    "skills": [{"name": "Java", "evidence": None}],
-                },
-            }
-        )
-    )
-    draft = await LiteLLMAgent(Settings(), registry, script).run(
-        state, request("我还会Java，" + negative)
-    )
-    assert draft.kind == "question" and draft.profile_changes is None
 
 
 async def test_review_i3_explicit_evidence_clear_is_not_a_permanent_review_loop(registry):
@@ -1225,24 +1119,6 @@ async def test_review_m1_clear_chinese_team_preferences(registry, text, preferen
     assert draft.kind == "profile" and draft.profile_changes.team_preference == preference
 
 
-async def test_review_m1_negated_team_preference_is_not_positive_basis(registry):
-    script = Script(
-        response(
-            {
-                "kind": "profile",
-                "message": "偏好草案。",
-                "profile_changes": {
-                    "team_preference": "team",
-                },
-            }
-        )
-    )
-    draft = await LiteLLMAgent(Settings(), registry, script).run(
-        snapshot(), request("我只想个人参赛，不想组队")
-    )
-    assert draft.kind == "question" and draft.profile_changes is None
-
-
 async def test_review_m2_large_json_integer_is_controlled(registry, caplog):
     large = "7" * 5000
     script = Script(
@@ -1251,54 +1127,6 @@ async def test_review_m2_large_json_integer_is_controlled(registry, caplog):
     error = await assert_invalid(LiteLLMAgent(Settings(), registry, script))
     assert len(script.calls) == 1
     assert large not in str(error) + caplog.text
-
-
-@pytest.mark.parametrize(
-    "text,evidence",
-    [
-        ("我学过Python，但没有取得全国一等奖。", "取得全国一等奖"),
-        ("Python经历：入门课程；Java经历：校赛一等奖。", "校赛一等奖"),
-        ("Python经历：没有取得全国一等奖。", "取得全国一等奖"),
-        ("Java经历：完成Python课程项目；我学过Python。", "完成Python课程项目"),
-        ("Python经历：入门课程 Java经历：校赛一等奖。", "入门课程 Java经历：校赛一等奖"),
-    ],
-)
-async def test_fix2_i3a_negation_or_other_skill_is_not_python_evidence(registry, text, evidence):
-    state = snapshot()
-    original = state.model_copy(deep=True)
-    script = Script(
-        response(
-            {
-                "kind": "profile",
-                "message": "技能草案。",
-                "profile_changes": {
-                    "skills": [{"name": "Python", "evidence": evidence}],
-                },
-            }
-        )
-    )
-    draft = await LiteLLMAgent(Settings(), registry, script).run(state, request(text))
-    assert draft.kind == "question" and draft.profile_changes is None
-    assert "Python" in draft.message and "依据" in draft.message
-    assert state == original
-
-
-async def test_fix2_n1_evidence_list_clear_does_not_authorize_skill_removal(registry):
-    python = {"name": "Python", "evidence": "Python课程项目"}
-    java = {"name": "Java", "evidence": "Java课程项目"}
-    state = snapshot(profile=Profile(skills=[python, java]))
-    original = state.model_copy(deep=True)
-    script = Script(
-        response(
-            {"kind": "profile", "message": "技能草案。", "profile_changes": {"skills": [java]}}
-        )
-    )
-    draft = await LiteLLMAgent(Settings(), registry, script).run(
-        state, request("请删除Python和Java的经历，保留这两项技能。")
-    )
-    assert draft.kind == "question" and draft.profile_changes is None
-    assert "Python" in draft.message and "删除" in draft.message
-    assert state == original
 
 
 async def test_fix2_positive_python_evidence_control(registry):
@@ -1335,94 +1163,3 @@ async def test_fix2_positive_explicit_skill_removal_control(registry):
     )
     assert draft.kind == "profile"
     assert draft.profile_changes.model_dump(exclude_unset=True)["skills"] == [java]
-
-
-async def test_fix2_i3a_unscoped_evidence_gets_a_resolvable_skill_question(registry):
-    expected = {"name": "Python", "evidence": "校赛一等奖"}
-    proposal = {
-        "kind": "profile",
-        "message": "技能草案。",
-        "profile_changes": {"skills": [expected]},
-    }
-    script = Script(response(proposal), response(proposal))
-    agent = LiteLLMAgent(Settings(), registry, script)
-    first = await agent.run(snapshot(), request("我学过Python，校赛一等奖。"))
-    assert first.kind == "question" and first.profile_changes is None
-    assert "Python" in first.message and "依据" in first.message
-    resolved = await agent.run(snapshot(), request("Python经历：校赛一等奖。"))
-    assert resolved.kind == "profile"
-    assert resolved.profile_changes.model_dump(exclude_unset=True)["skills"] == [expected]
-
-
-@pytest.mark.parametrize(
-    "text", ["请删除Python和Java的经历。", "请删除Python技能，保留Python技能。"]
-)
-async def test_fix2_n1_incomplete_target_or_keep_constraint_blocks_skill_removal(registry, text):
-    java = {"name": "Java", "evidence": "Java课程项目"}
-    state = snapshot(
-        profile=Profile(
-            skills=[
-                {"name": "Python", "evidence": "Python课程项目"},
-                java,
-            ]
-        )
-    )
-    script = Script(
-        response(
-            {"kind": "profile", "message": "技能草案。", "profile_changes": {"skills": [java]}}
-        )
-    )
-    result = await LiteLLMAgent(Settings(), registry, script).run(state, request(text))
-    assert result.kind == "question" and result.profile_changes is None
-    assert "Python" in result.message
-
-
-@pytest.mark.parametrize(
-    "text,kind",
-    [
-        ("Python经历：校赛一等奖，但没有校赛一等奖。", "question"),
-        ("Python经历：校赛一等奖；Java没有完成Java项目。", "profile"),
-    ],
-)
-async def test_fix2_i3a_denied_evidence_is_not_rescued_by_another_clause(registry, text, kind):
-    script = Script(
-        response(
-            {
-                "kind": "profile",
-                "message": "技能草案。",
-                "profile_changes": {
-                    "skills": [{"name": "Python", "evidence": "校赛一等奖"}],
-                },
-            }
-        )
-    )
-    draft = await LiteLLMAgent(Settings(), registry, script).run(snapshot(), request(text))
-    assert draft.kind == kind
-    if kind == "question":
-        assert draft.profile_changes is None and "Python" in draft.message
-
-
-@pytest.mark.parametrize("line_break", ["", "\n", "\r\n"])
-async def test_fix3_explicit_owner_is_not_lost_at_line_break(registry, line_break):
-    state = snapshot()
-    original = state.model_copy(deep=True)
-    script = Script(
-        response(
-            {
-                "kind": "profile",
-                "message": "虚构复审草案（AI 辅助生成）",
-                "profile_changes": {
-                    "skills": [
-                        {"name": "Python", "evidence": "完成Python课程项目"},
-                    ]
-                },
-            }
-        )
-    )
-    draft = await LiteLLMAgent(Settings(), registry, script).run(
-        state, request("Java经历：" + line_break + "完成Python课程项目；我学过Python。")
-    )
-    assert draft.kind == "question" and draft.profile_changes is None
-    assert "Python" in draft.message and "依据" in draft.message
-    assert state == original
-    assert len(script.calls) == 1

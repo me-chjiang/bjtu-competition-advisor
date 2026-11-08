@@ -414,6 +414,8 @@ export interface components {
             unavailable_dates?: string[];
             /** Additional Context */
             additional_context?: string | null;
+            /** Summary */
+            summary?: string | null;
         };
         /**
          * ProfileChanges
@@ -439,6 +441,8 @@ export interface components {
             unavailable_dates?: string[];
             /** Additional Context */
             additional_context?: string | null;
+            /** Summary */
+            summary?: string | null;
         };
         /** ProfilePatchRequest */
         ProfilePatchRequest: {

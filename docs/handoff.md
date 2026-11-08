@@ -77,6 +77,7 @@
 - 前端 TS 类型用 `openapi-typescript` 从 `/openapi.json` 生成（`npm run gen:api`）。
 - 范围：先让 R0→R1→R2→R4 接通真实后端，第二轮（方向报告、调研卡片、现场调研）随后做。
 - 连接：Vite 代理 `/api` → `127.0.0.1:8000`；单开关 `VITE_AGENT_API=real|mock`。
+- 画像放宽：移除年级/专业/工时/技能/组队的句式守卫，模型自由整理并输出 Markdown `summary`（前端渲染）；相关守卫测试已删除。
 - 联调目录：用 Lexmount 抓取算法编程 + 数学建模约 8–10 个竞赛，整理为 `data/competitions.json`（git-ignored），需人工审核。
 
 ## 待决事项（需要团队拍板）

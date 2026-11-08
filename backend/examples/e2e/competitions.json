@@ -1,0 +1,381 @@
+[
+  {
+    "competition_instance_id": "algo_school_2026",
+    "name": "虚构竞赛：2026 校内程序设计选拔赛（AI 辅助生成，非真实通知）",
+    "series_id": "algo_school",
+    "year": 2026,
+    "group": "本科组",
+    "stage": "校内选拔",
+    "eligibility_description": "本科生，计算机类专业；个人参赛。",
+    "registration_start": "2026-10-20",
+    "registration_deadline": "2026-11-20",
+    "competition_date": "2026-12-06",
+    "allowed_grades": [
+      "大一",
+      "大二",
+      "大三",
+      "大四"
+    ],
+    "allowed_majors": [
+      "计算机科学与技术",
+      "软件工程",
+      "人工智能",
+      "数据科学与大数据技术"
+    ],
+    "eligibility_evidence_ids": [
+      "ev_algo_school_2026"
+    ],
+    "registration_evidence_ids": [
+      "ev_algo_school_2026"
+    ],
+    "competition_date_evidence_ids": [
+      "ev_algo_school_2026"
+    ],
+    "evidence": [
+      {
+        "id": "ev_algo_school_2026",
+        "url": "https://example.com/fictional/algo_school/2026",
+        "excerpt": "AI 辅助生成的虚构示例：2026 年校内选拔本科组，主题：算法编程，个人赛。本科生，计算机类专业；个人参赛。报名 2026-10-20 至 2026-11-20。比赛日 2026-12-06。",
+        "fetched_at": "2026-10-28T10:00:00+08:00",
+        "applicable_year": 2026,
+        "scope": "applies-to/v1:{\"stage\":\"校内选拔\",\"group\":\"本科组\"}"
+      }
+    ]
+  },
+  {
+    "competition_instance_id": "algo_team_2026",
+    "name": "虚构竞赛：2026 团队程序设计邀请赛（AI 辅助生成，非真实通知）",
+    "series_id": "algo_team",
+    "year": 2026,
+    "group": "本科组",
+    "stage": "区域赛",
+    "eligibility_description": "大一至大三，计算机类专业；三人组队。",
+    "registration_start": "2026-11-10",
+    "registration_deadline": "2026-12-01",
+    "competition_date": "2026-12-20",
+    "allowed_grades": [
+      "大一",
+      "大二",
+      "大三"
+    ],
+    "allowed_majors": [
+      "计算机科学与技术",
+      "软件工程",
+      "人工智能",
+      "数据科学与大数据技术"
+    ],
+    "eligibility_evidence_ids": [
+      "ev_algo_team_2026"
+    ],
+    "registration_evidence_ids": [
+      "ev_algo_team_2026"
+    ],
+    "competition_date_evidence_ids": [
+      "ev_algo_team_2026"
+    ],
+    "evidence": [
+      {
+        "id": "ev_algo_team_2026",
+        "url": "https://example.com/fictional/algo_team/2026",
+        "excerpt": "AI 辅助生成的虚构示例：2026 年区域赛本科组，主题：算法编程，三人团队赛。大一至大三，计算机类专业；三人组队。报名 2026-11-10 至 2026-12-01。比赛日 2026-12-20。",
+        "fetched_at": "2026-10-28T10:00:00+08:00",
+        "applicable_year": 2026,
+        "scope": "applies-to/v1:{\"stage\":\"区域赛\",\"group\":\"本科组\"}"
+      }
+    ]
+  },
+  {
+    "competition_instance_id": "mcm_school_2026",
+    "name": "虚构竞赛：2026 校内数学建模竞赛（AI 辅助生成，非真实通知）",
+    "series_id": "mcm_school",
+    "year": 2026,
+    "group": "本科组",
+    "stage": "校内选拔",
+    "eligibility_description": "全体本科生，专业不限；三人组队。",
+    "registration_start": "2026-10-15",
+    "registration_deadline": "2026-11-15",
+    "competition_date": "2026-11-28",
+    "allowed_grades": [
+      "大一",
+      "大二",
+      "大三",
+      "大四"
+    ],
+    "allowed_majors": null,
+    "eligibility_evidence_ids": [
+      "ev_mcm_school_2026"
+    ],
+    "registration_evidence_ids": [
+      "ev_mcm_school_2026"
+    ],
+    "competition_date_evidence_ids": [
+      "ev_mcm_school_2026"
+    ],
+    "evidence": [
+      {
+        "id": "ev_mcm_school_2026",
+        "url": "https://example.com/fictional/mcm_school/2026",
+        "excerpt": "AI 辅助生成的虚构示例：2026 年校内选拔本科组，主题：数学建模，三人团队。全体本科生，专业不限；三人组队。报名 2026-10-15 至 2026-11-15。比赛日 2026-11-28。",
+        "fetched_at": "2026-10-28T10:00:00+08:00",
+        "applicable_year": 2026,
+        "scope": "applies-to/v1:{\"stage\":\"校内选拔\",\"group\":\"本科组\"}"
+      }
+    ]
+  },
+  {
+    "competition_instance_id": "stat_2026",
+    "name": "虚构竞赛：2026 统计建模挑战（AI 辅助生成，非真实通知）",
+    "series_id": "stat_model",
+    "year": 2026,
+    "group": "本科组",
+    "stage": "全国赛",
+    "eligibility_description": "大二及以上，数学/统计/计算机类；二至三人组队。",
+    "registration_start": "2026-11-01",
+    "registration_deadline": "2026-12-15",
+    "competition_date": "2027-01-10",
+    "allowed_grades": [
+      "大二",
+      "大三",
+      "大四"
+    ],
+    "allowed_majors": [
+      "数学与应用数学",
+      "信息与计算科学",
+      "统计学",
+      "计算机科学与技术",
+      "软件工程",
+      "人工智能",
+      "数据科学与大数据技术"
+    ],
+    "eligibility_evidence_ids": [
+      "ev_stat_2026"
+    ],
+    "registration_evidence_ids": [
+      "ev_stat_2026"
+    ],
+    "competition_date_evidence_ids": [
+      "ev_stat_2026"
+    ],
+    "evidence": [
+      {
+        "id": "ev_stat_2026",
+        "url": "https://example.com/fictional/stat_model/2026",
+        "excerpt": "AI 辅助生成的虚构示例：2026 年全国赛本科组，主题：统计建模与数据分析。大二及以上，数学/统计/计算机类；二至三人组队。报名 2026-11-01 至 2026-12-15。比赛日 2027-01-10。",
+        "fetched_at": "2026-10-28T10:00:00+08:00",
+        "applicable_year": 2026,
+        "scope": "applies-to/v1:{\"stage\":\"全国赛\",\"group\":\"本科组\"}"
+      }
+    ]
+  },
+  {
+    "competition_instance_id": "ai_vision_2026",
+    "name": "虚构竞赛：2026 青年 AI 视觉挑战赛（AI 辅助生成，非真实通知）",
+    "series_id": "ai_vision",
+    "year": 2026,
+    "group": "本科组",
+    "stage": "初赛",
+    "eligibility_description": "本科生，计算机/人工智能类；个人或团队均可。",
+    "registration_start": "2026-10-25",
+    "registration_deadline": "2026-11-30",
+    "competition_date": "2026-12-13",
+    "allowed_grades": [
+      "大一",
+      "大二",
+      "大三",
+      "大四"
+    ],
+    "allowed_majors": [
+      "计算机科学与技术",
+      "软件工程",
+      "人工智能",
+      "数据科学与大数据技术"
+    ],
+    "eligibility_evidence_ids": [
+      "ev_ai_vision_2026"
+    ],
+    "registration_evidence_ids": [
+      "ev_ai_vision_2026"
+    ],
+    "competition_date_evidence_ids": [
+      "ev_ai_vision_2026"
+    ],
+    "evidence": [
+      {
+        "id": "ev_ai_vision_2026",
+        "url": "https://example.com/fictional/ai_vision/2026",
+        "excerpt": "AI 辅助生成的虚构示例：2026 年初赛本科组，主题：计算机视觉，图像重建。本科生，计算机/人工智能类；个人或团队均可。报名 2026-10-25 至 2026-11-30。比赛日 2026-12-13。",
+        "fetched_at": "2026-10-28T10:00:00+08:00",
+        "applicable_year": 2026,
+        "scope": "applies-to/v1:{\"stage\":\"初赛\",\"group\":\"本科组\"}"
+      }
+    ]
+  },
+  {
+    "competition_instance_id": "math_contest_2026",
+    "name": "虚构竞赛：2026 大学生数学竞赛（非数学类）（AI 辅助生成，非真实通知）",
+    "series_id": "math_contest",
+    "year": 2026,
+    "group": "非数学类",
+    "stage": "初赛",
+    "eligibility_description": "非数学类专业本科生；个人参赛。",
+    "registration_start": "2026-09-01",
+    "registration_deadline": "2026-10-20",
+    "competition_date": "2026-11-08",
+    "allowed_grades": [
+      "大一",
+      "大二",
+      "大三",
+      "大四"
+    ],
+    "allowed_majors": null,
+    "eligibility_evidence_ids": [
+      "ev_math_contest_2026"
+    ],
+    "registration_evidence_ids": [
+      "ev_math_contest_2026"
+    ],
+    "competition_date_evidence_ids": [
+      "ev_math_contest_2026"
+    ],
+    "evidence": [
+      {
+        "id": "ev_math_contest_2026",
+        "url": "https://example.com/fictional/math_contest/2026",
+        "excerpt": "AI 辅助生成的虚构示例：2026 年初赛非数学类，主题：高等数学，个人笔试。非数学类专业本科生；个人参赛。报名 2026-09-01 至 2026-10-20。比赛日 2026-11-08。",
+        "fetched_at": "2026-10-28T10:00:00+08:00",
+        "applicable_year": 2026,
+        "scope": "applies-to/v1:{\"stage\":\"初赛\",\"group\":\"非数学类\"}"
+      }
+    ]
+  },
+  {
+    "competition_instance_id": "web_dev_2026",
+    "name": "虚构竞赛：2026 校园 Web 应用开发赛（AI 辅助生成，非真实通知）",
+    "series_id": "web_dev",
+    "year": 2026,
+    "group": null,
+    "stage": "校内选拔",
+    "eligibility_description": "本科生，专业不限；一至五人组队。",
+    "registration_start": "2026-11-05",
+    "registration_deadline": "2026-12-10",
+    "competition_date": "2027-03-20",
+    "allowed_grades": [
+      "大一",
+      "大二",
+      "大三",
+      "大四"
+    ],
+    "allowed_majors": null,
+    "eligibility_evidence_ids": [
+      "ev_web_dev_2026"
+    ],
+    "registration_evidence_ids": [
+      "ev_web_dev_2026"
+    ],
+    "competition_date_evidence_ids": [
+      "ev_web_dev_2026"
+    ],
+    "evidence": [
+      {
+        "id": "ev_web_dev_2026",
+        "url": "https://example.com/fictional/web_dev/2026",
+        "excerpt": "AI 辅助生成的虚构示例：2026 年校内选拔，主题：Web 全栈开发、PWA。本科生，专业不限；一至五人组队。报名 2026-11-05 至 2026-12-10。比赛日 2027-03-20。",
+        "fetched_at": "2026-10-28T10:00:00+08:00",
+        "applicable_year": 2026,
+        "scope": "applies-to/v1:{\"stage\":\"校内选拔\",\"group\":null}"
+      }
+    ]
+  },
+  {
+    "competition_instance_id": "robot_2026",
+    "name": "虚构竞赛：2026 智能机器人挑战（AI 辅助生成，非真实通知）",
+    "series_id": "robot",
+    "year": 2026,
+    "group": "本科组",
+    "stage": "省赛",
+    "eligibility_description": "往届面向本科生，本届规则未公布。",
+    "registration_start": null,
+    "registration_deadline": null,
+    "competition_date": null,
+    "allowed_grades": null,
+    "allowed_majors": null,
+    "eligibility_evidence_ids": [],
+    "registration_evidence_ids": [],
+    "competition_date_evidence_ids": [],
+    "evidence": [
+      {
+        "id": "ev_robot_2026",
+        "url": "https://example.com/fictional/robot/2025",
+        "excerpt": "AI 辅助生成的虚构示例：往届通知，主题：嵌入式与机器人，本届时间未公布。",
+        "fetched_at": "2026-10-28T10:00:00+08:00",
+        "applicable_year": 2025,
+        "scope": "往届通知"
+      }
+    ]
+  },
+  {
+    "competition_instance_id": "algo_cup_2027",
+    "name": "虚构竞赛：2027 春季算法杯（AI 辅助生成，非真实通知）",
+    "series_id": "algo_cup",
+    "year": 2027,
+    "group": null,
+    "stage": "网络赛",
+    "eligibility_description": "本届通知未发布。",
+    "registration_start": null,
+    "registration_deadline": null,
+    "competition_date": null,
+    "allowed_grades": null,
+    "allowed_majors": null,
+    "eligibility_evidence_ids": [],
+    "registration_evidence_ids": [],
+    "competition_date_evidence_ids": [],
+    "evidence": [
+      {
+        "id": "ev_algo_cup_2027",
+        "url": "https://example.com/fictional/algo_cup/2026",
+        "excerpt": "AI 辅助生成的虚构示例：往届通知，主题：算法编程，网络赛，本届时间未公布。",
+        "fetched_at": "2026-10-28T10:00:00+08:00",
+        "applicable_year": 2026,
+        "scope": "往届通知"
+      }
+    ]
+  },
+  {
+    "competition_instance_id": "english_2026",
+    "name": "虚构竞赛：2026 大学生英语写作大赛（AI 辅助生成，非真实通知）",
+    "series_id": "english",
+    "year": 2026,
+    "group": "本科组",
+    "stage": "初赛",
+    "eligibility_description": "全体本科生；个人参赛。",
+    "registration_start": "2026-10-10",
+    "registration_deadline": "2026-11-25",
+    "competition_date": "2026-12-05",
+    "allowed_grades": [
+      "大一",
+      "大二",
+      "大三",
+      "大四"
+    ],
+    "allowed_majors": null,
+    "eligibility_evidence_ids": [
+      "ev_english_2026"
+    ],
+    "registration_evidence_ids": [
+      "ev_english_2026"
+    ],
+    "competition_date_evidence_ids": [
+      "ev_english_2026"
+    ],
+    "evidence": [
+      {
+        "id": "ev_english_2026",
+        "url": "https://example.com/fictional/english/2026",
+        "excerpt": "AI 辅助生成的虚构示例：2026 年初赛本科组，主题：英语写作。全体本科生；个人参赛。报名 2026-10-10 至 2026-11-25。比赛日 2026-12-05。",
+        "fetched_at": "2026-10-28T10:00:00+08:00",
+        "applicable_year": 2026,
+        "scope": "applies-to/v1:{\"stage\":\"初赛\",\"group\":\"本科组\"}"
+      }
+    ]
+  }
+]

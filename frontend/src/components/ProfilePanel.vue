@@ -2,11 +2,13 @@
 import { reactive, ref } from 'vue';
 import type { Profile, ProfileChanges, TeamPreference } from '../api/types';
 import { TEAM_LABELS } from '../labels';
+import MarkdownText from './MarkdownText.vue';
 
 const props = defineProps<{ profile: Profile; busy: boolean; hasResults: boolean }>();
 const emit = defineEmits<{ save: [changes: ProfileChanges] }>();
 
 const MAX_CONTEXT = 2000;
+const MAX_SUMMARY = 4000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const editing = ref(false);
@@ -19,6 +21,7 @@ const draft = reactive({
   team_preference: '' as TeamPreference | '',
   unavailable_dates: '',
   additional_context: '',
+  summary: '',
   skills: [] as { name: string; evidence: string }[],
 });
 
@@ -34,6 +37,7 @@ function startEdit() {
     team_preference: p.team_preference ?? '',
     unavailable_dates: p.unavailable_dates.join('、'),
     additional_context: p.additional_context ?? '',
+    summary: p.summary ?? '',
     skills: p.skills.map((s) => ({ name: s.name, evidence: s.evidence ?? '' })),
   });
   errors.value = [];
@@ -46,6 +50,7 @@ function validate(): string[] {
   if (hours !== '' && !(typeof hours === 'number' && hours > 0)) list.push('每周可投入必须大于 0，或留空表示未知');
   if (splitList(draft.unavailable_dates).some((d) => !DATE_RE.test(d))) list.push('不可用日期格式应为 YYYY-MM-DD');
   if (draft.additional_context.length > MAX_CONTEXT) list.push(`补充说明不能超过 ${MAX_CONTEXT} 字`);
+  if (draft.summary.length > MAX_SUMMARY) list.push(`画像整理不能超过 ${MAX_SUMMARY} 字`);
   return list;
 }
 
@@ -61,6 +66,7 @@ function save() {
     team_preference: draft.team_preference || null,
     unavailable_dates: splitList(draft.unavailable_dates),
     additional_context: draft.additional_context.trim() || null,
+    summary: draft.summary.trim() || null,
   };
   // 只提交有改动的字段；数组整体替换
   const changes: Record<string, unknown> = {};
@@ -86,6 +92,10 @@ const show = (v: string | number | null | undefined) => (v === null || v === und
     </div>
 
     <template v-if="!editing">
+      <MarkdownText v-if="profile.summary" :source="profile.summary" />
+      <p v-else class="muted small">在右侧聊天里介绍自己，或直接粘贴简历，AI 会整理成画像。</p>
+      <details :open="!profile.summary">
+        <summary class="muted small">结构化字段（用于资格与工时计算）</summary>
       <dl>
         <dt>年级 / 专业</dt><dd>{{ show(profile.grade) }} · {{ show(profile.major) }}</dd>
         <dt>每周可投入</dt><dd>{{ profile.weekly_hours === null ? '未填写' : `${profile.weekly_hours} 小时` }}</dd>
@@ -104,10 +114,15 @@ const show = (v: string | number | null | undefined) => (v === null || v === und
         </dd>
         <dt>补充说明</dt><dd class="context">{{ show(profile.additional_context) }}</dd>
       </dl>
+      </details>
       <button type="button" :disabled="busy" @click="startEdit">编辑画像</button>
     </template>
 
     <form v-else @submit.prevent="save">
+      <label>
+        <span>画像整理（Markdown，最多 {{ MAX_SUMMARY }} 字）</span>
+        <textarea v-model="draft.summary" name="summary" rows="8" />
+      </label>
       <label><span>年级</span><input v-model="draft.grade" name="grade" /></label>
       <label><span>专业</span><input v-model="draft.major" name="major" /></label>
       <label>

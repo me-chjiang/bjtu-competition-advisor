@@ -7,6 +7,7 @@ import type { CandidateCard, LoginForm, Plan, SessionSnapshot } from '../api/typ
 import CandidateList from '../components/CandidateList.vue';
 import DynamicForm from '../components/DynamicForm.vue';
 import LlmSettingsDialog from '../components/LlmSettingsDialog.vue';
+import MarkdownText from '../components/MarkdownText.vue';
 import ProfilePanel from '../components/ProfilePanel.vue';
 import RoutePlan from '../components/RoutePlan.vue';
 import ScorecardList from '../components/ScorecardList.vue';
@@ -227,6 +228,23 @@ describe('ProfilePanel', () => {
     vi.restoreAllMocks();
   });
 
+  it('有 AI 整理时以 Markdown 展示，结构化字段收起；可直接编辑 Markdown', async () => {
+    const w = mount(ProfilePanel, { props: { profile, busy: false, hasResults: false } });
+    expect(w.find('.markdown h2').text()).toBe('基本情况');
+    expect(w.find('details').attributes('open')).toBeUndefined();
+    await edit(w);
+    await w.find('textarea[name="summary"]').setValue('## 新整理');
+    await w.find('form').trigger('submit');
+    expect(w.emitted('save')![0][0]).toEqual({ summary: '## 新整理' });
+  });
+
+  it('没有 AI 整理时提示可粘贴简历，并展开结构化字段', () => {
+    const w = mount(ProfilePanel, { props: { profile: { ...profile, summary: null }, busy: false, hasResults: false } });
+    expect(w.find('.markdown').exists()).toBe(false);
+    expect(w.text()).toContain('粘贴简历');
+    expect(w.find('details').attributes('open')).toBeDefined();
+  });
+
   it('只提交有改动的字段，数组整体替换，且不带出响应式 Proxy', async () => {
     const w = mount(ProfilePanel, { props: { profile, busy: false, hasResults: false } });
     await edit(w);
@@ -293,6 +311,32 @@ describe('ProfilePanel', () => {
     confirmSpy.mockReturnValue(true);
     await w.find('form').trigger('submit');
     expect(w.emitted('save')![0][0]).toEqual({ grade: '大三' });
+  });
+});
+
+describe('MarkdownText', () => {
+  it('渲染标题、列表和加粗', () => {
+    const w = mount(MarkdownText, { props: { source: '## 技能\n- **Python**：项目' } });
+    expect(w.find('h2').text()).toBe('技能');
+    expect(w.find('li strong').text()).toBe('Python');
+  });
+
+  it('原始 HTML 一律转义，不生成元素', () => {
+    const w = mount(MarkdownText, { props: { source: '<img src=x onerror="alert(1)"><script>alert(2)</script>' } });
+    expect(w.find('img').exists()).toBe(false);
+    expect(w.find('script').exists()).toBe(false);
+    expect(w.text()).toContain('<script>');
+  });
+
+  it('只有 http(s) 链接可点击，并在新窗口以 noopener 打开', () => {
+    const w = mount(MarkdownText, {
+      props: { source: '[官网](https://example.com) [坏链接](javascript:alert(1)) [数据](data:text/html,x)' },
+    });
+    const links = w.findAll('a');
+    expect(links).toHaveLength(1);
+    expect(links[0].attributes('href')).toBe('https://example.com');
+    expect(links[0].attributes('target')).toBe('_blank');
+    expect(links[0].attributes('rel')).toBe('noopener noreferrer');
   });
 });
 

@@ -362,6 +362,7 @@ async def test_complete_r0_r1_r2_r4_flow(settings):
                     "goals": [],
                     "team_preference": None,
                     "unavailable_dates": [],
+                    "summary": None,
                 }
                 original, request = state, body
                 assert [message["role"] for message in state["messages"]] == ["user", "assistant"]
@@ -921,25 +922,6 @@ async def test_question_preserves_review_results_and_noop_candidate_preserves_pl
         assert result["messages"][-1]["content"] == "只作解释，不改变结果。"
 
 
-async def test_unsupported_fake_profile_change_becomes_review_question(settings):
-    agent = ScriptedAgent(
-        drafts()
-        + [
-            {
-                "kind": "profile",
-                "message": "擅自覆盖",
-                "profile_changes": {"weekly_hours": 2},
-            }
-        ]
-    )
-    async with client_for(create_app(settings, agent, clock)) as client:
-        state = await reach_stage(client)
-        result, _ = await chat(client, state, content="随便聊聊。")
-        assert result["profile"] == state["profile"]
-        assert result["plan"] == state["plan"]
-        assert "每周投入" in result["message"]
-
-
 async def test_infeasible_plan_is_visible_but_cannot_be_confirmed(settings):
     script = drafts()
     script[3]["plan"]["tasks"][0]["estimated_hours"] = 10
@@ -1059,80 +1041,6 @@ def local_provider_app(settings, monkeypatch, script, clock_source=clock):
     assert isinstance(app.state.service.agent, LiteLLMAgent)
     assert app.state.service.agent.completion is None
     return app, calls
-
-
-@pytest.mark.parametrize("runner", ["default_provider", "untrusted_runner"])
-@pytest.mark.parametrize(
-    "field,wrong,negative,correct,affirmative,label",
-    [
-        (
-            "weekly_hours",
-            20,
-            "我每周不能投入20小时，实际每周只有6小时。",
-            8,
-            "每周能投入8小时",
-            "每周投入",
-        ),
-        (
-            "major",
-            "金融",
-            "不要把专业改成金融，我的专业仍是计算机。",
-            "金融",
-            "请更正专业为金融",
-            "专业",
-        ),
-        ("grade", "大三", "我不是大三，我是大二。", "大三", "我是大三", "年级"),
-    ],
-)
-async def test_final_i1_negated_scalar_preserves_confirmed_results_then_correction_resolves(
-    settings, monkeypatch, runner, field, wrong, negative, correct, affirmative, label
-):
-    bad = {"kind": "profile", "message": "错误提取", "profile_changes": {field: wrong}}
-    good = {"kind": "profile", "message": "请核对更正。", "profile_changes": {field: correct}}
-    script = drafts() + [bad, good, good]
-    if runner == "default_provider":
-        # R1 must really discover IDs via a local tool, not bypass its exposure ledger.
-        script.insert(
-            1,
-            {
-                "tool_calls": [
-                    {
-                        "id": "search",
-                        "type": "function",
-                        "function": {
-                            "name": "search_competitions",
-                            "arguments": "{}",
-                        },
-                    }
-                ]
-            },
-        )
-        app, _ = local_provider_app(settings, monkeypatch, script)
-    else:
-        app = create_app(settings, ScriptedAgent(script), clock)
-    store = app.state.service.store
-    async with client_for(app) as client:
-        state = await reach_stage(client)
-        saved = store.load(state["session_id"])
-        assert saved.confirmed_profile is not None
-        assert state["cards"] and state["plan"]["feasibility"] == "feasible"
-        reviewed, _ = await chat(client, state, content=negative)
-        for key in ("stage", "status", "needs_confirmation", "profile", "cards", "plan"):
-            assert reviewed[key] == state[key]
-        assert label in reviewed["message"] and "核对" in reviewed["message"]
-        after = store.load(state["session_id"])
-        assert after.confirmed_profile == saved.confirmed_profile
-        assert after.coarse_cards == saved.coarse_cards
-        reviewed = await confirm(client, reviewed)
-        assert reviewed["status"] == "completed"  # The preserved valid plan is still confirmable.
-        edited, _ = await chat(client, reviewed, content=affirmative)
-        assert edited["profile"][field] == correct
-        assert (edited["stage"], edited["status"]) == ("R0", "collecting")
-        assert edited["cards"] == [] and edited["plan"] is None
-        assert store.load(state["session_id"]).confirmed_profile is None
-        # A following R0 review/confirm still works; no permanent review loop.
-        reviewed, _ = await chat(client, edited)
-        assert (await confirm(client, reviewed))["stage"] == "R1"
 
 
 @pytest.mark.parametrize("field,value", [("grade", "大三"), ("major", "金融"), ("weekly_hours", 8)])

@@ -63,8 +63,10 @@ class Profile(DTO):
     team_preference: Literal["solo", "team", "either"] | None = None
     unavailable_dates: list[date] = Field(default_factory=list)
     additional_context: Annotated[str, Field(max_length=2000)] | None = None
+    # AI-organized Markdown profile; the frontend renders it with raw HTML disabled.
+    summary: Annotated[str, Field(max_length=4000)] | None = None
 
-    @field_validator("additional_context", mode="before")
+    @field_validator("additional_context", "summary", mode="before")
     @classmethod
     def normalize_blank_context(cls, value: Any) -> Any:
         if isinstance(value, str) and not value.strip():

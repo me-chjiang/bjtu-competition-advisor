@@ -21,11 +21,24 @@ export const DRAFT_PROFILE: Profile = {
   team_preference: 'either',
   unavailable_dates: [],
   additional_context: null,
+  summary: [
+    '## 基本情况',
+    '- 大二，计算机科学与技术（示例）',
+    '- 每周可投入约 8 小时，个人或组队均可',
+    '',
+    '## 技能与经历',
+    '- **Python**：课程大作业，爬虫 + 数据分析',
+    '- **数据结构与算法**：课程成绩良好，刷题约 80 道',
+    '- **高等数学**：期末 90 分',
+    '',
+    '## 目标',
+    '- 保研加分、丰富简历',
+  ].join('\n'),
 };
 
 export const EMPTY_PROFILE: Profile = {
   grade: null, major: null, skills: [], weekly_hours: null, goals: [],
-  team_preference: null, unavailable_dates: [], additional_context: null,
+  team_preference: null, unavailable_dates: [], additional_context: null, summary: null,
 };
 
 function evidence(id: string, name: string): Evidence[] {
