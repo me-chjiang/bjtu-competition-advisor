@@ -8,7 +8,7 @@
 
 | 配置项 | 来源与默认建议 |
 |---|---|
-| `DEEPSEEK_API_KEY` | LiteLLM 官方 DeepSeek provider 读取的环境变量，必需；安全注入，不写进前端 |
+| `DEEPSEEK_API_KEY` | LiteLLM 官方 DeepSeek provider 读取的环境变量，必需；环境注入，或在网页「模型设置」经 `PATCH /api/settings/llm` 写入后端内存（不落盘、不回显） |
 | `LLM_MODEL` | 默认 `deepseek/deepseek-chat`，带 `deepseek/` provider 前缀 |
 | `LLM_TIMEOUT_SECONDS` | 默认 30 秒；实际单次不超过 30 秒及整请求剩余时间 |
 | `LLM_MAX_OUTPUT_TOKENS` | 默认/上限 4096，真实 provider 参数支持仍待验证 |
@@ -115,7 +115,7 @@ async def extract_profile(text: str) -> ProfileDraft:
 
 - 先校验 JSON/Pydantic，再检查实例 ID、证据 ID、适用年度和组别、日期、资格及每周总投入。模型只能引用本次上下文或工具提供的证据 ID，URL 和摘录由后端按 ID 填入；不能把模型生成的 URL 当来源。
 - 事实载荷在格式修复前先过唯一 preflight：实例/引用容器必须健全，证据属于对应实例；明确事实必须同年、同 stage/group、已获取，scope 严格采用 [applies-to/v1 JSON](frontend-contract.md#4-推荐卡片证据和路线)。往届/范围不明证据只能作带 uncertainties 的 inferred 背景。服务再次用自己构造的允许范围执行同一校验，不相信注入 Runner 的“已校验”声明：R2 只能分析 keep 的项，R4 只能选择 keep 且已分析的项。
-- Agent 和 service 共享当前消息依据检查：年级/专业/工时收集有限肯定归属或更正语法中的值，不用单独子串命中证明授权。候选值的否定/不确定表述、多个冲突值、未解析的相关字段表述均先给具体字段核对问题，保留画像/confirmed_profile/有效结果。随后“请更正专业为金融”“我是大三”“每周能投入8小时”可继续聊天更正，直接 PATCH 仍有效；additional_context 不构成全局修改锁。不将否定词全局封禁：技能经历/删除、中文组队偏好保留独立规则，“不组队”可表达 solo。它不是通用 NLP 证明器，复杂表达需具体核对或直接 PATCH。
+- 2026-10-29 起画像整理不再限制句式：用户可用自述或粘贴简历，模型据此归纳结构化字段并写 `summary`；更正以用户最新表述为准，判断不了的字段保持 `null`。画像发生实质变化仍按上文失效规则回到 R0，并需用户在 R0 核对确认，模型不能代为确认。（原「有限肯定/更正语法」检查已移除。）
 - 提供依据不等于推断一定正确；不输出无依据的获奖概率、保研加分或“稳健推荐”。来源缺失正常返回未知，不要求模型补齐事实。
 - 模型草案与正式 HTTP 快照分开；只有整份输出通过校验且 revision 仍匹配，才原子保存到会话文件。失败保留上次有效结果。
 - guard 内先比对成功 request_id 的完整请求、再查 revision；成功消息/状态/缓存一次保存，失败/取消/写盘异常无半结果。重启可重放原快照，不调用模型；确认只接受当前阶段/version，且不调用模型。R4 的 `weekly_load/conflicts/feasibility` 来自 Python `evaluate_plan`，模型填写 server 字段被拒绝；confirm 按当前时钟重新评估，unknown/infeasible 不能完成。

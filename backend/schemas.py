@@ -63,8 +63,10 @@ class Profile(DTO):
     team_preference: Literal["solo", "team", "either"] | None = None
     unavailable_dates: list[date] = Field(default_factory=list)
     additional_context: Annotated[str, Field(max_length=2000)] | None = None
+    # AI-organized Markdown profile; the frontend renders it with raw HTML disabled.
+    summary: Annotated[str, Field(max_length=4000)] | None = None
 
-    @field_validator("additional_context", mode="before")
+    @field_validator("additional_context", "summary", mode="before")
     @classmethod
     def normalize_blank_context(cls, value: Any) -> Any:
         if isinstance(value, str) and not value.strip():
@@ -112,6 +114,23 @@ class CandidatePatchRequest(DTO):
 class ConfirmRequest(DTO):
     expected_revision: Revision
     stage: Stage
+
+
+LLM_MODELS = ("deepseek/deepseek-chat", "deepseek/deepseek-reasoner")
+LLMModel = Literal["deepseek/deepseek-chat", "deepseek/deepseek-reasoner"]
+
+
+class LLMSettingsPatch(DTO):
+    api_key: Annotated[str, Field(min_length=1, max_length=512)] | None = None
+    model: LLMModel | None = None
+
+
+class LLMSettingsView(DTO):
+    """Never carries the key itself, only whether one is held in memory."""
+
+    configured: bool
+    model: str
+    available_models: list[str]
 
 
 class Message(DTO):

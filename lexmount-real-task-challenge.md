@@ -6,7 +6,7 @@
 ## TL;DR
 
 - **报名**：已于 2026-10-09 开放。登录后填写基本信息即可报名，题目与队伍可稍后确定。[来源](https://browser.lexmount.cn/events/real-task-challenge/login)
-- **提交截止（DDL）**：2026-10-25 23:59（北京时间，UTC+8）。报名、投稿与修改同时截止。距今约 12 天。[来源](https://browser.lexmount.cn/events/real-task-challenge/)
+- **提交截止（DDL）**：已延期至 2026-11-08（10-29 用户确认）；原定 2026-10-25 23:59（北京时间，UTC+8），报名、投稿与修改同时截止。[来源](https://browser.lexmount.cn/events/real-task-challenge/)
 - **评选与公示**：2026-10-31 20:00（北京时间），结果在活动页公示。[来源](https://browser.lexmount.cn/events/real-task-challenge/)
 - **奖金**：现金总奖池 35,500 元，最多 42 份作品获奖。[来源](https://browser.lexmount.cn/events/real-task-challenge/)
 - **必做动作**：

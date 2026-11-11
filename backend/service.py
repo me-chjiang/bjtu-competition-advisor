@@ -7,7 +7,7 @@ from uuid import uuid4
 from pydantic import ValidationError
 from pydantic_core import PydanticSerializationError
 
-from backend.agent import LiteLLMAgent, _Context
+from backend.agent import _Context
 from backend.catalog import (
     CompetitionCatalog,
     assess_competition,
@@ -168,9 +168,7 @@ class SessionService:
                 if card.decision == "keep" and (draft.kind != "plan" or card.dimensions):
                     context.detail(card.competition_instance_id)
         context.preflight(payload)
-        # Literal, conservative provenance is shared with the default Agent;
-        # additional_context is not a global edit lock for any runner.
-        return LiteLLMAgent._review_conflict(draft, snapshot, request)
+        return draft
 
     async def chat(self, session_id: str, request: ChatRequest) -> SessionSnapshot:
         async with self.store.guard(session_id):

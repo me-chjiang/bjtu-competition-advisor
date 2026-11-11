@@ -1,8 +1,25 @@
-# 交接：进度与待办（2026-10-18）
+# 交接：进度与待办（2026-10-29 更新）
 
 > AI 辅助生成（Claude Code / OpenCode），截至 10-18：隔离工作区 Task 1–5 分任务独立审查及最终问题修复复审均通过。最终审查发现的否定画像误写、过去任务可确认及状态文档问题已关闭。本波离线全套 **426 passed**（修复前 391），验证见下方报告。真实模型/provider/SDK/MIS 联网未验收；任务与最终修复均由控制者正常 GPG 提交，不自动 push。
 
-截止：2026-10-25 23:59（北京时间），计划 10-24 提交。方案见 `docs/plan.md`，原定 10-14 的决策门槛目前只完成了一部分。
+截止：2026-11-08（10-29 用户确认，原定 10-25 已延期）。方案见 `docs/plan.md`，原定 10-14 的决策门槛目前只完成了一部分。
+
+## 10-16 更新（优先阅读）
+
+- **方向调整**：核心从「MIS 采集 + 推荐」转为「公开网络上的竞赛行情调研 + 参赛方案优化」，MIS 降为可选。
+  - 详见 `docs/plan.md`「方向调整（2026-10-16）」、根目录 `REQUIREMENTS.md` 和 `PLAN.md` 的「第二轮」。
+  - 有 5 项待拍板，拍板前不开工。
+- **第一轮已交付**（loop-dev-cycle，进度见 `CYCLE_STATE.md`）：
+  - `frontend/`：Vue 3 + Vite + TS。
+    - 登录页、等待页，以及 R0→R1→R2→R4 的 Agent 页（mock 模式）；
+    - MIS 和 Agent 各有一个开关，可以分别在 mock 和真实后端之间切换。
+    - 已在 `frontend` 分支提交。
+  - 旧 MIS 后端（FastAPI + Lexmount Python SDK，`/mis/*` 代填登录与列表采集，用户本人登录后实测成功）：10-29 合并 main 时按用户决定删除，改以 main 的 Agent 后端为准；`collector.py` 与 `/mis/*` 待移植进新后端。
+  - `docs/api-contract.md`：前后端接口契约。Agent 部分待用户确认，并且需要按第二轮调整，例如补上 S 类、新增 `/research` 和 `/directions` 接口。
+- **运行方式**
+  - 后端：见 `README.md`
+  - 前端：`cd frontend && npm ci && npm run dev`
+  - 默认使用 mock；要接真实 MIS 时，前面加上 `VITE_MIS_API=real`。
 
 ## 已完成 / 已验证
 
@@ -22,8 +39,8 @@
 
 ### A：采集与云端
 - [ ] 在 Linux 上验证 Lexmount 原生 MCP / CLI + Skill 的接入（首选路线），记录接入步骤。SDK + Playwright 只作为不兼容设备的备选。
-- [ ] **`issue.md` #1**（备选路线）：去掉 `inspectUrl` 弹窗登录（延迟太高），改为「本地前端输入账号 → 后端用 Lexmount 登录」。隧道改为可选开关。
-- [ ] `collect/mis.mjs` 端到端跑通 1 页，再全量采集约 700 条及详情页；去重。
+- [x] **`issue.md` #1**（备选路线，10-15 已实现）：去掉 `inspectUrl` 弹窗登录（延迟太高），改为「本地前端输入账号 → 后端用 Lexmount 登录」。隧道改为可选开关。
+- [x] 列表全量采集已由旧 MIS 后端 `collector.py` 完成（10-29 已随旧后端删除，待移植）（10-15：竞赛项目 724 条，可报名轮次 43 条）；详情页和 Node 脚本 `collect/mis.mjs` 未跑。
   - 代码已写好，但没有成功跑过。
   - 采集对象是「竞赛项目」页 `/innovation/cpitem/`；这个页面是否支持 `perpage` 参数还没验证（「竞赛报名」页支持）。
 - [ ] `enrich/fetch.mjs`：分层抓取，先用 WebFetch，失败再用云浏览器；用必应搜索补全竞赛官网和章程。WebFetch 的接口和额度待确认。
@@ -52,6 +69,16 @@
   - 用 3 份虚构画像检查分档；
   - 请 3–5 位同学试用。
 - [ ] 提交材料：脱敏日志、session 回放、抽检表、2–3 分钟录屏。
+
+## 10-29 前端对接决定
+
+- 契约以后端为准：`docs/frontend-contract.md` + `/openapi.json`；`docs/api-contract.md` 的 Agent 部分作废。
+- MIS 登录/等待页下线路由，`/` 直接进 `/advisor`；页面代码保留，`/mis/*` 移植另排期。
+- 前端 TS 类型用 `openapi-typescript` 从 `/openapi.json` 生成（`npm run gen:api`）。
+- 范围：先让 R0→R1→R2→R4 接通真实后端，第二轮（方向报告、调研卡片、现场调研）随后做。
+- 连接：Vite 代理 `/api` → `127.0.0.1:8000`；单开关 `VITE_AGENT_API=real|mock`。
+- 画像放宽：移除年级/专业/工时/技能/组队的句式守卫，模型自由整理并输出 Markdown `summary`（前端渲染）；相关守卫测试已删除。
+- 联调目录：用 Lexmount 抓取算法编程 + 数学建模约 8–10 个竞赛，整理为 `data/competitions.json`（git-ignored），需人工审核。
 
 ## 待决事项（需要团队拍板）
 

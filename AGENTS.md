@@ -7,11 +7,14 @@
 ## 项目概述
 
 - 参加 Lexmount「真实任务挑战」的作品：北交大竞赛「能力匹配」Agent。
-- 用 Lexmount 云浏览器采集教务系统（MIS）上的竞赛，补全公开信息，再由多轮筛选和多 Agent 讨论给出参赛方案。
+- 2026-10-16 起的定位：用 Lexmount 云浏览器在公开网络上做「竞赛行情调研」（类比求职行情调研），输出方向行情报告、单项调研卡片和优化后的参赛方案。
+- 教务系统（MIS）采集降为北交大同学的可选增强，因为评委无法登录 MIS。
 - **开工前先读**：
   - `docs/handoff.md`：当前进度、待办、待决事项
   - `docs/plan.md`：已确认的方案
   - `issue.md`：未解决的问题
+  - `REQUIREMENTS.md`、`PLAN.md`、`CYCLE_STATE.md`：loop-dev-cycle 的需求、规划和状态
+  - `docs/api-contract.md`：前后端接口契约
 
 ## 凭据与隐私（必须遵守）
 
@@ -43,6 +46,9 @@
 ## 运行
 
 - Node ≥ 20，执行 `npm ci`。
+- 后端（Python ≥3.10）：从仓库根目录运行 `python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --workers 1`，安装和测试见 `README.md`「本地 Python 后端」
+- 前端：`cd frontend && npm ci && npm run dev`（`127.0.0.1:5173`）；测试：`npm test`
+  - 默认使用 mock；`VITE_MIS_API=real` 接真实 MIS 后端，`VITE_AGENT_API=real` 接真实 Agent 后端。
 - 冒烟测试：`node scripts/smoke-test.mjs`
 - 采集 MIS（1 页）：`node collect/mis.mjs --pages 1 --perpage 20`
 - 命令输出较长时写到文件里，只看末尾。

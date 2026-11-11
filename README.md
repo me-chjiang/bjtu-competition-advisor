@@ -1,6 +1,6 @@
 # bjtu-competition-advisor
 
-北交大竞赛「能力匹配」Agent，Lexmount「真实任务挑战」参赛作品（截止 2026-10-25 23:59，北京时间）。
+北交大竞赛「能力匹配」Agent，Lexmount「真实任务挑战」参赛作品（截止 2026-11-08，原定 10-25 已延期）。
 
 ## 快速开始：现有采集工具（Linux / macOS）
 
@@ -58,7 +58,7 @@ export BJTU_ALLOWED_ORIGINS=http://localhost:5173
 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
-无 key 时可创建、读取、编辑会话以及查询竞赛；chat 返回 `503 LLM_NOT_CONFIGURED`。需要真实模型时，先明确费用授权，再通过进程管理器/安全环境注入 `DEEPSEEK_API_KEY`，重启服务；不要把 key 写进命令历史、聊天或文档。模型能力仍需用虚构画像单独联网验收，安装成功不等于 provider 支持工具/JSON 参数。
+无 key 时可创建、读取、编辑会话以及查询竞赛；chat 返回 `503 LLM_NOT_CONFIGURED`。需要真实模型时，先明确费用授权，再通过进程管理器/安全环境注入 `DEEPSEEK_API_KEY` 并重启服务，或在前端页头「模型设置」填写 key 和模型（只存后端内存，重启后需重填）；不要把 key 写进命令历史、聊天或文档。模型能力仍需用虚构画像单独联网验收，安装成功不等于 provider 支持工具/JSON 参数。
 
 如确需私有 YAML，使用自己的启动模块显式调用 `Settings.from_sources(os.environ, Path("lexmount-config.yaml"))`，再交给 `create_app(settings)`；环境优先。可读键为 `deepseek-api-key`、`llm-model`、`llm-timeout-seconds`、`llm-max-output-tokens`、`bjtu-data-dir`、`bjtu-catalog-path`、`bjtu-allowed-origins`，其他 Lexmount/MIS 凭据不会保留到 Settings。不要修改或提交真实配置。
 
@@ -70,7 +70,7 @@ curl http://127.0.0.1:8000/api/competitions/fictional_2026_open
 ```
 
 - OpenAPI：`http://127.0.0.1:8000/openapi.json`；交互文档：`/docs`。画像、候选 PATCH、chat、confirm 的字段见[前后端契约](docs/frontend-contract.md)。确认只确认当前 revision，不调用模型；无预算可筛选，但不能最终确认未知可行性路线。日历返回 `501 FEATURE_NOT_ENABLED`。
-- 画像的年级/专业/工时修改只接受有限明确肯定/更正语法；否定、冲突或无法解析时核对具体字段，保留已确认画像及有效结果，明确更正或 PATCH 可继续。技能与中文组队规则独立，“不组队”仍有效。路线任务不得早于后端 clock 的北京时间今天：过去或跨今天任务明确不可行并要求重排，不分配该任务周负载、不假设已完成；工具/生成/延迟确认共用规则。
+- 画像可用自述或粘贴简历，由模型整理为结构化字段和 Markdown `summary`，不再限制句式；画像变化仍回到 R0 由用户确认。路线任务不得早于后端 clock 的北京时间今天：过去或跨今天任务明确不可行并要求重排，不分配该任务周负载、不假设已完成；工具/生成/延迟确认共用规则。
 - 缺竞赛文件：`503 CATALOG_NOT_CONFIGURED`；损坏目录：`503 CATALOG_INVALID`；损坏会话/写盘失败：`500 INTERNAL_ERROR`，不覆盖损坏文件。配置无效在 factory/显式读取时以 `CONFIG_INVALID` 拒绝启动，不伪装为缺目录。
 - 仅运行一个 worker。真实资料和会话放忽略的 `data/`，限制访问并备份。存储拒绝已存在的会话目录/文件符号链接，但**不是针对恶意本地进程并发换链的文件系统沙箱**；受信任的 data 边界及上级目录应由部署者保护。
 - 默认仅本机访问；开放网络前必须实现鉴权和会话归属校验。CORS 不等于鉴权；预检协议拒绝可能是纯文本，不保证业务 JSON 错误包。

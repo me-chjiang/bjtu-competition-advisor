@@ -11,7 +11,7 @@
 - 首版只做普通请求响应，不承诺 SSE、WebSocket、后台任务或断线续传。加载动画由前端维护，最终状态以服务端快照为准。
 - 开发跨域只允许明确配置的前端 origin（协议、域名、端口），不默认放开 `*`。公网部署前须补充鉴权和会话归属检查；CORS 和随机 session ID 都不等于鉴权。
 - 统一 JSON 错误包适用于业务路由、业务校验和 HTTP 错误边界；CORS 预检属于协议层，拒绝可能返回纯文本 `400`，前端不要强行解析为业务 JSON。
-- 本文不包含 MIS 账号与验证码接口，其流程仍见 `../issue.md` #1；不得把账号或模型 key 塞入推荐聊天接口。
+- 本文不包含 MIS 账号与验证码接口，其流程仍见 `../issue.md` #1；不得把账号或模型 key 塞入推荐聊天接口；模型 key 只走下面的 `/settings/llm`（2026-10-29 用户决定改为网页配置）。
 
 ## 2. 接口清单
 
@@ -25,8 +25,12 @@
 | `POST /sessions/{id}/confirm` | `expected_revision`、`stage` | `200`，推进后的快照 |
 | `GET /competitions/{id}` | 无 | `200`，竞赛实例及证据 |
 | `GET /sessions/{id}/calendar.ics` | 无 | 可选功能：`200`，`text/calendar; charset=utf-8` |
+| `GET /settings/llm` | 无 | `200`，`configured`、`model`、`available_models` |
+| `PATCH /settings/llm` | `api_key?`、`model?` | `200`，同上 |
 
 日历启用后只导出最终确认且日期明确的事件；未完成方案返回 `409 PLAN_NOT_CONFIRMED`，没有可导出日期返回 `409 NO_CONFIRMED_DATES`。未启用功能返回 `501 FEATURE_NOT_ENABLED`，前端首版不展示下载入口。
+
+模型设置：key 只保存在后端进程内存，不落盘，后端重启后需重新填写；任何响应都不回显 key，只返回 `configured`。`model` 仅接受 `available_models` 白名单（`deepseek/deepseek-chat`、`deepseek/deepseek-reasoner`），其他值 `422`；省略的字段保持不变。前端用密码输入框，保存后清空，不写 localStorage。PATCH 带 JSON 体必然触发 CORS 预检，浏览器里只有已配置的 origin 能修改；这不是鉴权，公网部署前须另加。注入非 LiteLLM Agent 时返回 `501 FEATURE_NOT_ENABLED`。
 
 ### 会话快照
 
@@ -74,9 +78,11 @@
 
 `additional_context` 为可选补充文本，类型 `string | null`、默认 `null`、最多 2000 字符，空白文本归一化为 `null`。用于补充经历、偏好和特殊限制，不是任意 JSON 扩展字段。整个文本随 PATCH 替换，`null` 清空。后端可以提出结构化信息修改建议，但不得把补充文本当系统指令或擅自解决与已确认字段的冲突；界面提醒勿填写账号密码等敏感信息。
 
+`summary` 为 AI 整理的 Markdown 画像，`string | null`，最多 4000 字符，空白归一化为 `null`；用户也可 PATCH 修改。前端用禁用原始 HTML 的 Markdown 渲染，链接仅放行 HTTP(S)。模型被要求不写手机号、邮箱、学号、证件号。
+
 `changes` 只允许上述字段，未提供的字段保持原值，数组整体替换；`null` 只用于允许为空的字段。模型提取的信息也是草案，不能把猜测当作用户确认。
 
-聊天修改年级、专业、每周投入仅接受有限的明确肯定/更正语法，例如“我是大三”“请更正专业为金融”“每周能投入8小时”。候选值被否定、存在多个冲突值或字段表达无法明确解析时，返回具体字段核对问题，保留原画像、已确认画像及当前有效结果；不会因一句否定而清空旧分析。随后明确更正或直接 PATCH 均可解除核对，不要求新增确认字段。此边界不是通用自然语言理解；技能经历/删除和中文组队偏好使用各自规则，“不组队”仍可表达个人参赛。
+2026-10-29 起画像整理不再限制句式：用户可用自述或粘贴简历，模型据此归纳结构化字段并写 `summary`；更正以用户最新表述为准，判断不了的字段保持 `null`。画像发生实质变化仍按上文失效规则回到 R0，并需用户在 R0 核对确认，模型不能代为确认。
 
 ## 3. 聊天、修改和阶段确认
 
@@ -195,7 +201,7 @@ chat 使用前端生成的唯一 `request_id`：相同 ID、相同请求体在�
 | 422 | `VALIDATION_ERROR` | 显示字段错误；后端需统一 FastAPI 默认校验响应 |
 | 429 | `RATE_LIMITED` | 显示稍后再试，遵循存在的 `Retry-After` |
 | 502 | `LLM_INVALID_OUTPUT` / `UPSTREAM_ERROR` | 保留上次有效结果，提示失败 |
-| 503 | `LLM_NOT_CONFIGURED` / `CATALOG_NOT_CONFIGURED` | 提示模型或竞赛资料尚未配置，前端不收集密钥 |
+| 503 | `LLM_NOT_CONFIGURED` / `CATALOG_NOT_CONFIGURED` | 提示模型或竞赛资料尚未配置；`LLM_NOT_CONFIGURED` 时引导打开「模型设置」 |
 | 503 | `CATALOG_INVALID` | 竞赛文件损坏/内容无效，不当作空列表 |
 | 504 | `UPSTREAM_TIMEOUT` | 先 GET 确认状态，不直接重复付费调用 |
 | 500 | `INTERNAL_ERROR` | 显示通用错误及 request ID，不展示原始异常 |
